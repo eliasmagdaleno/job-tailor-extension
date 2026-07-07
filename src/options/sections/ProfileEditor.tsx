@@ -14,15 +14,48 @@ const EMPTY_PROFILE: MasterProfile = {
 export default function ProfileEditor() {
   const [profile, setProfile] = useState<MasterProfile>(EMPTY_PROFILE);
   const [apiKey, setApiKeyState] = useState<string | null>(null);
-  const [status, setStatus] = useState<"idle" | "saved" | "importing" | "import-failed">("idle");
+  const [status, setStatus] = useState<"idle" | "saved" | "importing" | "import-failed" | "imported">("idle");
+
+  // Raw, unnormalized text the user is currently typing. Kept separate from
+  // `profile` so that delimiter keystrokes (Enter for bullets, comma for
+  // skills) aren't eaten by a controlled value that re-renders from a
+  // filtered array on every change. Normalized into `profile` on save.
+  const [bulletsDrafts, setBulletsDrafts] = useState<string[]>([]);
+  const [skillsDraft, setSkillsDraft] = useState<string>("");
+
+  function resetDrafts(p: MasterProfile) {
+    setBulletsDrafts(p.experience.map((exp) => exp.bullets.join("\n")));
+    setSkillsDraft(p.skills.join(", "));
+  }
 
   useEffect(() => {
-    void getMasterProfile().then((p) => p && setProfile(p));
+    void getMasterProfile().then((p) => {
+      if (p) {
+        setProfile(p);
+        resetDrafts(p);
+      }
+    });
     void getApiKey().then(setApiKeyState);
   }, []);
 
   async function handleSave() {
-    await setMasterProfile(profile);
+    const normalized: MasterProfile = {
+      ...profile,
+      experience: profile.experience.map((exp, i) => ({
+        ...exp,
+        bullets: (bulletsDrafts[i] ?? "")
+          .split("\n")
+          .map((b) => b.trim())
+          .filter(Boolean),
+      })),
+      skills: skillsDraft
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    };
+    await setMasterProfile(normalized);
+    setProfile(normalized);
+    resetDrafts(normalized);
     setStatus("saved");
   }
 
@@ -40,8 +73,11 @@ export default function ProfileEditor() {
     })) as { ok: true; data: MasterProfile } | { ok: false; error: string };
 
     if (response.ok) {
+      // Imported data is reviewable/editable before it's persisted — do not
+      // auto-save, and do not claim "Saved." when nothing was written.
       setProfile(response.data);
-      setStatus("saved");
+      resetDrafts(response.data);
+      setStatus("imported");
     } else {
       setStatus("import-failed");
     }
@@ -52,6 +88,7 @@ export default function ProfileEditor() {
       ...profile,
       experience: [...profile.experience, { company: "", title: "", startDate: "", endDate: "Present", bullets: [] }],
     });
+    setBulletsDrafts([...bulletsDrafts, ""]);
   }
 
   function updateExperience(index: number, updates: Partial<MasterProfile["experience"][number]>) {
@@ -61,8 +98,13 @@ export default function ProfileEditor() {
     });
   }
 
+  function updateBulletsDraft(index: number, value: string) {
+    setBulletsDrafts((drafts) => drafts.map((d, i) => (i === index ? value : d)));
+  }
+
   function removeExperience(index: number) {
     setProfile({ ...profile, experience: profile.experience.filter((_, i) => i !== index) });
+    setBulletsDrafts((drafts) => drafts.filter((_, i) => i !== index));
   }
 
   function addEducation() {
@@ -96,6 +138,7 @@ export default function ProfileEditor() {
       </label>
       {status === "importing" && <p>Importing…</p>}
       {status === "import-failed" && <p>Import failed. Set your API key first, or fill the form manually.</p>}
+      {status === "imported" && <p>Imported — review below, then click Save Profile.</p>}
 
       <fieldset>
         <legend>Contact</legend>
@@ -126,8 +169,8 @@ export default function ProfileEditor() {
             <input placeholder="End date" value={exp.endDate} onChange={(e) => updateExperience(i, { endDate: e.target.value })} />
             <textarea
               placeholder="One bullet per line"
-              value={exp.bullets.join("\n")}
-              onChange={(e) => updateExperience(i, { bullets: e.target.value.split("\n").filter(Boolean) })}
+              value={bulletsDrafts[i] ?? ""}
+              onChange={(e) => updateBulletsDraft(i, e.target.value)}
             />
             <button onClick={() => removeExperience(i)}>Remove</button>
           </div>
@@ -151,10 +194,7 @@ export default function ProfileEditor() {
 
       <label>
         Skills (comma-separated)
-        <input
-          value={profile.skills.join(", ")}
-          onChange={(e) => setProfile({ ...profile, skills: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-        />
+        <input value={skillsDraft} onChange={(e) => setSkillsDraft(e.target.value)} />
       </label>
 
       <button onClick={handleSave}>Save Profile</button>
