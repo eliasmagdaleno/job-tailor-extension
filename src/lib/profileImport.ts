@@ -27,6 +27,7 @@ export function parseProfileImportResponse(raw: string): MasterProfile {
   if (
     typeof profile.contact?.name !== "string" ||
     typeof profile.contact?.email !== "string" ||
+    typeof profile.summary !== "string" ||
     !Array.isArray(profile.experience) ||
     !Array.isArray(profile.education) ||
     !Array.isArray(profile.skills)

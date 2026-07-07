@@ -36,4 +36,17 @@ describe("parseProfileImportResponse", () => {
       )
     ).toThrow(/required profile fields/);
   });
+
+  it("throws when summary is missing", () => {
+    expect(() =>
+      parseProfileImportResponse(
+        JSON.stringify({
+          contact: { name: "Jane", email: "j@example.com" },
+          experience: [],
+          education: [],
+          skills: [],
+        })
+      )
+    ).toThrow(/required profile fields/);
+  });
 });
