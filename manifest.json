@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "description": "Generate a tailored resume and cover letter from a job listing, and track your applications.",
   "icons": {
-    "48": "src/assets/icons/icon-48.png",
-    "128": "src/assets/icons/icon-128.png"
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   },
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
@@ -25,7 +25,7 @@
   "action": {
     "default_popup": "src/popup/index.html",
     "default_icon": {
-      "48": "src/assets/icons/icon-48.png"
+      "48": "icons/icon-48.png"
     }
   },
   "options_ui": {
