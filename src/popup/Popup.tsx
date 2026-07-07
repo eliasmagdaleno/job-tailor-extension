@@ -19,8 +19,17 @@ type PopupState =
     }
   | { step: "error"; message: string; retry: () => void };
 
+function isProfileIncomplete(profile: MasterProfile): boolean {
+  return (
+    !profile.contact.name.trim() ||
+    !profile.contact.email.trim() ||
+    (profile.experience.length === 0 && !profile.summary.trim())
+  );
+}
+
 export default function Popup() {
   const [state, setState] = useState<PopupState>({ step: "loading" });
+  const [logging, setLogging] = useState(false);
 
   useEffect(() => {
     void bootstrap();
@@ -33,7 +42,7 @@ export default function Popup() {
       return;
     }
     const profile = await getMasterProfile();
-    if (!profile) {
+    if (!profile || isProfileIncomplete(profile)) {
       setState({ step: "setup-required", missing: "profile" });
       return;
     }
@@ -79,19 +88,24 @@ export default function Popup() {
   }
 
   async function handleMarkAsApplied() {
-    if (state.step !== "generated") return;
+    if (state.step !== "generated" || logging) return;
     const { jobData } = state;
-    const dateApplied = new Date().toISOString().slice(0, 10);
-    await addApplication({
-      id: crypto.randomUUID(),
-      dateApplied,
-      company: jobData.company,
-      jobTitle: jobData.title,
-      site: jobData.site,
-      jobUrl: jobData.url,
-      status: "applied",
-    });
-    setState({ ...state, alreadyLoggedOn: dateApplied });
+    setLogging(true);
+    try {
+      const dateApplied = new Date().toISOString().slice(0, 10);
+      await addApplication({
+        id: crypto.randomUUID(),
+        dateApplied,
+        company: jobData.company,
+        jobTitle: jobData.title,
+        site: jobData.site,
+        jobUrl: jobData.url,
+        status: "applied",
+      });
+      setState({ ...state, alreadyLoggedOn: dateApplied });
+    } finally {
+      setLogging(false);
+    }
   }
 
   async function handleDownloadResume() {
@@ -155,7 +169,9 @@ export default function Popup() {
       <button onClick={handleDownloadResume}>Download Resume PDF</button>
       <button onClick={handleDownloadCoverLetter}>Download Cover Letter PDF</button>
       {state.alreadyLoggedOn && <p>Already logged on {state.alreadyLoggedOn}.</p>}
-      <button onClick={handleMarkAsApplied}>{state.alreadyLoggedOn ? "Log Anyway" : "Mark as Applied"}</button>
+      <button onClick={handleMarkAsApplied} disabled={logging}>
+        {state.alreadyLoggedOn ? "Log Anyway" : "Mark as Applied"}
+      </button>
     </div>
   );
 }
