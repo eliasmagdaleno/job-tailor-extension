@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Job Tailor",
+  "version": "0.1.0",
+  "description": "Generate a tailored resume and cover letter from a job listing, and track your applications.",
+  "icons": {
+    "48": "src/assets/icons/icon-48.png",
+    "128": "src/assets/icons/icon-128.png"
+  },
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.welcome-to-the-jungle.com/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": {
+    "scripts": ["src/background/background.ts"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.welcome-to-the-jungle.com/*"],
+      "js": ["src/content-scripts/wttj-parser.ts"]
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "48": "src/assets/icons/icon-48.png"
+    }
+  },
+  "options_ui": {
+    "page": "src/options/index.html",
+    "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "job-tailor@example.com",
+      "strict_min_version": "115.0"
+    }
+  }
+}
