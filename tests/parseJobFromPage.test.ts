@@ -43,6 +43,17 @@ describe("parseJobFromPage", () => {
     expect(result?.company).toBe("Acme");
   });
 
+  it("does not use og:site_name as the company when the title has no 'at X' suffix", () => {
+    const doc = makeDoc(`
+      <meta property="og:title" content="Product Designer" />
+      <meta property="og:site_name" content="Welcome to the Jungle" />
+      <main>${"Design end-to-end product experiences. ".repeat(5)}</main>
+    `);
+    const result = parseJobFromPage(doc, "https://www.welcome-to-the-jungle.com/en/companies/acme/jobs/1");
+    expect(result?.parsedVia).toBe("fallback");
+    expect(result?.company).toBe("Unknown company");
+  });
+
   it("returns null when neither strategy finds enough content", () => {
     const doc = makeDoc("<p>nothing useful here</p>");
     expect(parseJobFromPage(doc, "https://example.com")).toBeNull();

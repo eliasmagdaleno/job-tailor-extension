@@ -7,8 +7,20 @@ import type { JobData, MasterProfile, TailoredOutput } from "../lib/types";
 type PopupState =
   | { step: "loading" }
   | { step: "setup-required"; missing: "apiKey" | "profile" }
-  | { step: "ready"; apiKey: string; profile: MasterProfile; jobData: JobData | null }
-  | { step: "generating"; apiKey: string; profile: MasterProfile; jobData: JobData }
+  | {
+      step: "ready";
+      apiKey: string;
+      profile: MasterProfile;
+      jobData: JobData | null;
+      alreadyLoggedOn: string | null; // dateApplied of the existing record, if any
+    }
+  | {
+      step: "generating";
+      apiKey: string;
+      profile: MasterProfile;
+      jobData: JobData;
+      alreadyLoggedOn: string | null;
+    }
   | {
       step: "generated";
       apiKey: string;
@@ -47,7 +59,10 @@ export default function Popup() {
       return;
     }
     const jobData = await parseCurrentTab();
-    setState({ step: "ready", apiKey, profile, jobData });
+    const alreadyLoggedOn = jobData
+      ? ((await findApplicationByUrl(jobData.url))?.dateApplied ?? null)
+      : null;
+    setState({ step: "ready", apiKey, profile, jobData, alreadyLoggedOn });
   }
 
   async function parseCurrentTab(): Promise<JobData | null> {
@@ -63,14 +78,25 @@ export default function Popup() {
 
   async function handleGenerate(jobData: JobData) {
     if (state.step !== "ready") return;
-    const { apiKey, profile } = state;
-    setState({ step: "generating", apiKey, profile, jobData });
-    const response = (await browser.runtime.sendMessage({
-      type: "GENERATE_TAILORED",
-      jobData,
-      profile,
-      apiKey,
-    })) as { ok: true; data: TailoredOutput } | { ok: false; error: string };
+    const { apiKey, profile, alreadyLoggedOn } = state;
+    setState({ step: "generating", apiKey, profile, jobData, alreadyLoggedOn });
+
+    let response: { ok: true; data: TailoredOutput } | { ok: false; error: string };
+    try {
+      response = (await browser.runtime.sendMessage({
+        type: "GENERATE_TAILORED",
+        jobData,
+        profile,
+        apiKey,
+      })) as { ok: true; data: TailoredOutput } | { ok: false; error: string };
+    } catch (err) {
+      setState({
+        step: "error",
+        message: err instanceof Error ? err.message : String(err),
+        retry: () => void handleGenerate(jobData),
+      });
+      return;
+    }
 
     if (response.ok) {
       const existing = await findApplicationByUrl(jobData.url);
@@ -145,6 +171,7 @@ export default function Popup() {
         <p>
           Found: {jobData.title} @ {jobData.company}
         </p>
+        {state.alreadyLoggedOn && <p>Already logged on {state.alreadyLoggedOn}.</p>}
         <button onClick={() => handleGenerate(jobData)}>Generate</button>
       </div>
     );

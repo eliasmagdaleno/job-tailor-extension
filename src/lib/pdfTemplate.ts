@@ -65,6 +65,10 @@ export function renderCoverLetterHtml(output: TailoredOutput, contact: MasterPro
 export async function downloadPdf(html: string, filename: string): Promise<void> {
   const container = document.createElement("div");
   container.innerHTML = html;
+  container.style.position = "fixed";
+  container.style.left = "-10000px";
+  container.style.top = "0";
+  container.style.width = "720px";
   container.style.padding = "32px";
   container.style.fontFamily = "Helvetica, Arial, sans-serif";
   document.body.appendChild(container);

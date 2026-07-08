@@ -72,12 +72,17 @@ function stripHtml(doc: Document, html: string): string {
 
 function parseFromFallbackHeuristics(doc: Document): PartialJobData | null {
   const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute("content");
-  const ogSiteName = doc.querySelector('meta[property="og:site_name"]')?.getAttribute("content");
   const title = ogTitle ?? (doc.title || null);
   const main = doc.querySelector("main");
   const description = main?.textContent?.replace(/\s+/g, " ").trim();
 
   if (!title || !description || description.length < 40) return null;
 
-  return { title, company: ogSiteName ?? "Unknown company", description };
+  // og:site_name is the job board (e.g. "Welcome to the Jungle"), never the
+  // employer, so it must never be used as the company. Derive the company
+  // from the "<title> at <company>" pattern instead.
+  const companyMatch = title.match(/\bat\s+(.+)$/);
+  const company = companyMatch ? companyMatch[1].trim() : "Unknown company";
+
+  return { title, company, description };
 }

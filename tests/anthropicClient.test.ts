@@ -92,4 +92,17 @@ describe("callClaudeApi", () => {
     );
     await expect(callClaudeApi("bad-key", "sys", [])).rejects.toThrow(/Claude API error \(401\)/);
   });
+
+  it("throws a clear error when the response was cut off by the max_tokens limit", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ content: [{ type: "text", text: "partial" }], stop_reason: "max_tokens" }),
+      }))
+    );
+    await expect(
+      callClaudeApi("sk-ant-test", "system prompt", [{ role: "user", content: "hi" }])
+    ).rejects.toThrow(/cut off/);
+  });
 });

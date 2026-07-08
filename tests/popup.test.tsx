@@ -76,6 +76,70 @@ describe("Popup", () => {
     expect(screen.getByText("Tailored summary")).toBeInTheDocument();
   });
 
+  it("shows 'Already logged on' immediately when the job was previously applied to, without clicking Generate", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "Product designer with 5 years of experience.",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue({
+      id: "abc123",
+      dateApplied: "2026-07-01",
+      company: "Acme",
+      jobTitle: "Product Designer",
+      site: "Welcome to the Jungle",
+      jobUrl: "https://example.com/job/1",
+      status: "applied",
+    });
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+
+    render(<Popup />);
+    expect(await screen.findByText(/Product Designer @ Acme/)).toBeInTheDocument();
+    expect(await screen.findByText(/Already logged on 2026-07-01/)).toBeInTheDocument();
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("shows an error with a Retry button when the background message send rejects", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "Product designer with 5 years of experience.",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockRejectedValue(
+      new Error("Could not establish connection. Receiving end does not exist.")
+    );
+
+    render(<Popup />);
+    expect(await screen.findByText(/Product Designer @ Acme/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    expect(await screen.findByText(/Receiving end does not exist/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
   it("prompts for profile setup when the saved profile is empty", async () => {
     vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
     vi.mocked(storage.getMasterProfile).mockResolvedValue({

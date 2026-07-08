@@ -70,7 +70,7 @@ export async function callClaudeApi(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 16000,
       system,
       messages,
     }),
@@ -81,7 +81,15 @@ export async function callClaudeApi(
     throw new Error(`Claude API error (${response.status}): ${text}`);
   }
 
-  const data = (await response.json()) as { content: Array<{ type: string; text?: string }> };
+  const data = (await response.json()) as {
+    content: Array<{ type: string; text?: string }>;
+    stop_reason?: string;
+  };
+
+  if (data.stop_reason === "max_tokens") {
+    throw new Error("Claude's response was cut off before completing (output limit reached). Try again.");
+  }
+
   const textBlock = data.content.find((block) => block.type === "text");
   if (!textBlock?.text) {
     throw new Error("Claude API response contained no text content");
