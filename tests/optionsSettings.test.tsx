@@ -92,7 +92,7 @@ describe("ProfileEditor", () => {
     // Wait for the initial getApiKey() effect to resolve so handleImport
     // doesn't race the async load and hit the "no API key" branch.
     await waitFor(() => expect(storage.getApiKey).toHaveResolved());
-    const fileInput = (await screen.findByLabelText("Import from resume file")) as HTMLInputElement;
+    const fileInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
     const file = new File(["resume text"], "resume.txt", { type: "text/plain" });
     // jsdom's File/Blob doesn't implement text() — stub it so handleImport's
     // `await file.text()` resolves as it would in a real browser.

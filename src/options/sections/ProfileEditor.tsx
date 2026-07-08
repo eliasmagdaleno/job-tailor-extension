@@ -129,10 +129,10 @@ export default function ProfileEditor() {
     <div>
       <h2>Master Profile</h2>
       <label>
-        Import from resume file
+        Import from resume file (.txt or .md — plain text only in v1)
         <input
           type="file"
-          accept=".txt,.pdf,.docx"
+          accept=".txt,.md"
           onChange={(e) => e.target.files?.[0] && void handleImport(e.target.files[0])}
         />
       </label>
