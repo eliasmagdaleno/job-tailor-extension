@@ -1,6 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
+
+vi.mock("webextension-polyfill", () => ({
+  default: {
+    runtime: {
+      getURL: vi.fn((path: string) => path),
+    },
+  },
+}));
+
 import * as mammoth from "mammoth";
-import { linesToMarkdown, extractDocxMarkdown, ExtractionError, type ExtractedLine } from "../src/lib/fileTextExtractor";
+import * as pdfjs from "pdfjs-dist";
+import {
+  linesToMarkdown,
+  extractDocxMarkdown,
+  extractPdfMarkdown,
+  ExtractionError,
+  type ExtractedLine,
+} from "../src/lib/fileTextExtractor";
 
 vi.mock("mammoth", () => ({
   convertToHtml: vi.fn(),
@@ -15,6 +31,11 @@ vi.mock("turndown", () => ({
         .trim()
     ),
   })),
+}));
+
+vi.mock("pdfjs-dist", () => ({
+  GlobalWorkerOptions: { workerSrc: "" },
+  getDocument: vi.fn(),
 }));
 
 describe("linesToMarkdown", () => {
@@ -102,5 +123,92 @@ describe("extractDocxMarkdown", () => {
     vi.mocked(mammoth.convertToHtml).mockResolvedValue({ value: "<p></p>", messages: [] });
 
     await expect(extractDocxMarkdown(new ArrayBuffer(8))).rejects.toThrow(/couldn't find readable text/i);
+  });
+});
+
+interface FakePdfTextItem {
+  str: string;
+  fontSize: number;
+  hasEOL: boolean;
+}
+
+function makeFakePdfDoc(pages: FakePdfTextItem[][]) {
+  return {
+    numPages: pages.length,
+    getPage: (pageNum: number) =>
+      Promise.resolve({
+        getTextContent: () =>
+          Promise.resolve({
+            items: pages[pageNum - 1].map((item) => ({
+              str: item.str,
+              transform: [item.fontSize, 0, 0, item.fontSize, 0, 0],
+              hasEOL: item.hasEOL,
+            })),
+          }),
+      }),
+  };
+}
+
+describe("extractPdfMarkdown", () => {
+  it("groups text items into lines (on hasEOL) and runs them through linesToMarkdown", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.resolve(
+        makeFakePdfDoc([
+          [
+            { str: "Jane Doe", fontSize: 20, hasEOL: true },
+            { str: "Software Engineer with five years of experience.", fontSize: 10, hasEOL: true },
+            { str: "• Built scalable APIs", fontSize: 10, hasEOL: true },
+          ],
+        ])
+      ),
+    } as ReturnType<typeof pdfjs.getDocument>);
+
+    const result = await extractPdfMarkdown(new ArrayBuffer(8));
+
+    expect(result).toBe(
+      "## Jane Doe\n\nSoftware Engineer with five years of experience.\n\n- Built scalable APIs"
+    );
+  });
+
+  it("joins text items across multiple pages", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.resolve(
+        makeFakePdfDoc([
+          [{ str: "Jane Doe, a software engineer with five years of experience.", fontSize: 10, hasEOL: true }],
+          [{ str: "References available on request from prior employers.", fontSize: 10, hasEOL: true }],
+        ])
+      ),
+    } as ReturnType<typeof pdfjs.getDocument>);
+
+    const result = await extractPdfMarkdown(new ArrayBuffer(8));
+
+    expect(result).toContain("Jane Doe, a software engineer");
+    expect(result).toContain("References available on request");
+  });
+
+  it("maps a password-protected PDF to a friendly ExtractionError", async () => {
+    const passwordError = new Error("No password given");
+    passwordError.name = "PasswordException";
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.reject(passwordError),
+    } as ReturnType<typeof pdfjs.getDocument>);
+
+    await expect(extractPdfMarkdown(new ArrayBuffer(8))).rejects.toThrow(/password-protected/i);
+  });
+
+  it("maps any other pdf.js load failure to a generic ExtractionError", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.reject(new Error("Invalid PDF structure")),
+    } as ReturnType<typeof pdfjs.getDocument>);
+
+    await expect(extractPdfMarkdown(new ArrayBuffer(8))).rejects.toThrow(ExtractionError);
+  });
+
+  it("throws ExtractionError when the PDF has no extractable text (e.g. scanned image)", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.resolve(makeFakePdfDoc([[]])),
+    } as ReturnType<typeof pdfjs.getDocument>);
+
+    await expect(extractPdfMarkdown(new ArrayBuffer(8))).rejects.toThrow(/scanned image/i);
   });
 });
