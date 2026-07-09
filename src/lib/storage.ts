@@ -1,10 +1,11 @@
 import browser from "webextension-polyfill";
-import type { ApplicationRecord, MasterProfile } from "./types";
+import type { ApplicationRecord, GenerationStatus, MasterProfile } from "./types";
 
 const KEYS = {
   apiKey: "anthropicApiKey",
   profile: "masterProfile",
   applications: "applications",
+  generationStatus: "generationStatus",
 } as const;
 
 export async function getApiKey(): Promise<string | null> {
@@ -54,4 +55,13 @@ export async function deleteApplication(id: string): Promise<void> {
 export async function findApplicationByUrl(jobUrl: string): Promise<ApplicationRecord | null> {
   const existing = await getApplications();
   return existing.find((r) => r.jobUrl === jobUrl) ?? null;
+}
+
+export async function getGenerationStatus(): Promise<GenerationStatus> {
+  const result = await browser.storage.local.get(KEYS.generationStatus);
+  return (result[KEYS.generationStatus] as GenerationStatus | undefined) ?? null;
+}
+
+export async function setGenerationStatus(status: GenerationStatus): Promise<void> {
+  await browser.storage.local.set({ [KEYS.generationStatus]: status });
 }

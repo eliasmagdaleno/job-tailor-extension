@@ -56,6 +56,13 @@ export interface TailoredOutput {
   coverLetter?: string;
 }
 
+export type GenerationStatus =
+  | { phase: "running"; jobData: JobData; parts: GenerationParts; startedAt: number }
+  | { phase: "done"; jobData: JobData; parts: GenerationParts; output: TailoredOutput }
+  | { phase: "error"; jobData: JobData; parts: GenerationParts; message: string }
+  | { phase: "cancelled"; jobData: JobData; parts: GenerationParts }
+  | null;
+
 export interface ApplicationRecord {
   id: string;
   dateApplied: string;

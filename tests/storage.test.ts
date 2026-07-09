@@ -25,8 +25,10 @@ import {
   updateApplication,
   deleteApplication,
   findApplicationByUrl,
+  getGenerationStatus,
+  setGenerationStatus,
 } from "../src/lib/storage";
-import type { ApplicationRecord, MasterProfile } from "../src/lib/types";
+import type { ApplicationRecord, GenerationStatus, JobData, MasterProfile } from "../src/lib/types";
 
 beforeEach(() => {
   for (const key of Object.keys(store)) delete store[key];
@@ -80,5 +82,34 @@ describe("storage", () => {
 
     await deleteApplication("1");
     expect(await getApplications()).toEqual([]);
+  });
+
+  const sampleJobData: JobData = {
+    title: "Product Designer",
+    company: "Acme",
+    description: "desc",
+    url: "https://example.com/job/1",
+    site: "Welcome to the Jungle",
+    parsedVia: "structured",
+  };
+
+  describe("generation status", () => {
+    it("returns null when no generation status is set, and round-trips one", async () => {
+      expect(await getGenerationStatus()).toBeNull();
+      const status: GenerationStatus = {
+        phase: "running",
+        jobData: sampleJobData,
+        parts: { resume: true, coverLetter: true },
+        startedAt: 1234,
+      };
+      await setGenerationStatus(status);
+      expect(await getGenerationStatus()).toEqual(status);
+    });
+
+    it("clears the generation status by setting null", async () => {
+      await setGenerationStatus({ phase: "cancelled", jobData: sampleJobData, parts: { resume: true, coverLetter: true } });
+      await setGenerationStatus(null);
+      expect(await getGenerationStatus()).toBeNull();
+    });
   });
 });
