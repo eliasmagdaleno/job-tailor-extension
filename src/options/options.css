@@ -1,0 +1,655 @@
+/* Job Tailor — options (the Workbook)
+ *
+ * Direction: the bound book behind the tailor's counter. The popup is a single
+ * order ticket torn from this book. Same cloth, chalk, and brass; same tape
+ * measure running the margin. Here it opens to full page: an account
+ * (authorization), a pattern block (the measurements every résumé is cut from),
+ * and an order book (the ledger of commissions).
+ *
+ * Signatures, spent in two places only:
+ *   1. A tick-ruler tape running the full height of the left margin.
+ *   2. The order book rendered as a cream paper ledger — the one light
+ *      artifact in the dark atelier, echoing the popup's single hang-tag.
+ * Everything else stays quiet: ruled "measurement blank" fields, running-stitch
+ * seams, and the uppercase-mono spec hand for every label.
+ */
+
+:root {
+  --cloth: #191c27;
+  --cloth-raise: #20242f;
+  --cloth-sink: #14161f;
+  --chalk: #e9ecf3;
+  --chalk-dim: #9aa0b2;
+  --brass: #c9a24b;
+  --brass-bright: #e4c173;
+  --thread: #ce5646;
+  --ink: #191c27;
+
+  /* cream ledger paper */
+  --paper: #ece7d9;
+  --paper-line: #c8bfa8;
+  --paper-ink: #2a2620;
+  --paper-ink-dim: #6f675a;
+
+  --seam: rgba(233, 236, 243, 0.1);
+  --seam-strong: rgba(233, 236, 243, 0.22);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo,
+    Consolas, monospace;
+
+  --tape: 34px;      /* width of the measuring-tape spine */
+  --col: 760px;      /* working column width */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--cloth);
+  color: var(--chalk);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+  /* faint twill weave, matched to the popup — near-invisible, reads as cloth */
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.012) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 3px);
+}
+
+/* ── Signature 1: the tape-measure spine ──────────────────────────────── */
+
+.wb {
+  position: relative;
+  min-height: 100vh;
+  padding-left: var(--tape);
+  animation: wb-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes wb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+.wb__tape {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--tape);
+  border-right: 1px solid rgba(201, 162, 75, 0.45);
+  background: var(--cloth-sink);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* minor chalk ticks every 13px */
+.wb__tape::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  right: 0;
+  width: 9px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--seam-strong) 0 1px,
+    transparent 1px 13px
+  );
+}
+
+/* major brass ticks every 65px */
+.wb__tape::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  right: 0;
+  width: 16px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--brass) 0 1.5px,
+    transparent 1.5px 65px
+  );
+}
+
+.wb__inner {
+  max-width: var(--col);
+  margin: 0 auto;
+  padding: 40px 32px 96px;
+}
+
+/* ── Masthead ─────────────────────────────────────────────────────────── */
+
+.wb__masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wb__shears {
+  color: var(--brass);
+  font-size: 22px;
+  line-height: 1;
+  transform: translateY(2px);
+}
+
+.wb__wordmark {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--chalk);
+}
+
+.wb__tagline {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+}
+
+/* ── Running-stitch seam ──────────────────────────────────────────────── */
+
+.wb__seam {
+  height: 1px;
+  border: 0;
+  margin: 20px 0 0;
+  background: repeating-linear-gradient(
+    to right,
+    var(--seam-strong) 0 6px,
+    transparent 6px 11px
+  );
+}
+
+/* ── Clause (section) ─────────────────────────────────────────────────── */
+
+.wb__clause {
+  margin-top: 52px;
+}
+
+.wb__clause-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.wb__clause-no {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--brass);
+  white-space: nowrap;
+}
+
+.wb__clause-title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--chalk);
+}
+
+.wb__clause-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  min-width: 24px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--seam-strong) 0 6px,
+    transparent 6px 11px
+  );
+  transform: translateY(-3px);
+}
+
+.wb__lede {
+  margin: 0 0 20px;
+  max-width: 56ch;
+  color: var(--chalk-dim);
+  font-size: 14px;
+}
+
+/* ── Fields: ruled "measurement blanks" ───────────────────────────────── */
+
+.wb__label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+  margin: 0 0 7px;
+}
+
+.wb__field {
+  margin-bottom: 18px;
+}
+
+/* Underline-only inputs — a value written on a printed rule, not a box. */
+.wb__input,
+.wb__textarea {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  color: var(--chalk);
+  border: 0;
+  border-bottom: 1.5px solid var(--seam-strong);
+  border-radius: 0;
+  padding: 7px 2px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wb__textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.wb__input::placeholder,
+.wb__textarea::placeholder {
+  color: var(--chalk-dim);
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.wb__input:focus,
+.wb__textarea:focus {
+  outline: none;
+  border-bottom-color: var(--brass);
+  box-shadow: 0 1.5px 0 0 var(--brass);
+}
+
+/* A row of blanks side by side, like a measurement card's paired fields. */
+.wb__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 22px;
+}
+
+.wb__row--dates {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+/* Fieldset groups — reset the browser's default box; the label is the header. */
+.wb__group {
+  border: 0;
+  margin: 0 0 26px;
+  padding: 0;
+  min-width: 0;
+}
+
+.wb__group-label {
+  margin-bottom: 12px;
+}
+
+/* ── Pattern pieces: repeated experience / education entries ───────────── */
+
+.wb__pieces {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wb__piece {
+  position: relative;
+  padding: 18px 18px 16px;
+  background: var(--cloth-raise);
+  /* angled top-left corner — the same cut as the popup's hang-tag */
+  clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+  border-left: 2px solid rgba(201, 162, 75, 0.35);
+}
+
+.wb__piece-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.wb__piece-tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+/* ── Buttons (shared with popup's language) ───────────────────────────── */
+
+.wb__btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease,
+    transform 0.06s ease;
+}
+
+.wb__btn:active {
+  transform: translateY(1px);
+}
+
+.wb__btn--primary {
+  background: var(--brass);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.wb__btn--primary:hover {
+  background: var(--brass-bright);
+}
+
+.wb__btn--ghost {
+  background: transparent;
+  color: var(--chalk);
+  border-color: var(--seam-strong);
+}
+
+.wb__btn--ghost:hover {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+/* small, quiet destructive — a snip of the thread */
+.wb__btn--snip {
+  padding: 5px 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  background: transparent;
+  border-color: transparent;
+  color: var(--chalk-dim);
+}
+
+.wb__btn--snip:hover {
+  color: var(--thread);
+}
+
+.wb__btn:focus-visible {
+  outline: 2px solid var(--brass-bright);
+  outline-offset: 2px;
+}
+
+.wb__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+/* ── Stamp: the "saved / imported" confirmation ───────────────────────── */
+
+.wb__stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+  margin: 0;
+}
+
+.wb__stamp::before {
+  content: "✓";
+  color: var(--brass);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.wb__stamp--work::before {
+  content: "…";
+}
+
+/* ── Error: red thread ────────────────────────────────────────────────── */
+
+.wb__alert {
+  border-left: 2px solid var(--thread);
+  padding: 4px 0 4px 14px;
+  margin: 16px 0 0;
+}
+
+.wb__alert-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--thread);
+  margin-bottom: 3px;
+}
+
+.wb__alert-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--chalk);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Import affordance (the "cut from an existing garment" input) ──────── */
+
+.wb__import {
+  display: block;
+  margin-bottom: 22px;
+}
+
+.wb__import-hint {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+  margin-bottom: 8px;
+}
+
+.wb__file {
+  display: block;
+  width: 100%;
+  color: var(--chalk-dim);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+.wb__file::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--seam-strong);
+  border-radius: 2px;
+  background: var(--cloth-raise);
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.wb__file::file-selector-button:hover {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+/* ── Signature 2: the order book (cream paper ledger) ─────────────────── */
+
+.wb__ledger-wrap {
+  overflow-x: auto;
+}
+
+.wb__ledger {
+  position: relative;
+  margin-top: 4px;
+  padding: 22px 26px 26px 40px;
+  min-width: 560px;
+  background: var(--paper);
+  color: var(--paper-ink);
+  /* torn/angled top-left corner, like a leaf of the book */
+  clip-path: polygon(18px 0, 100% 0, 100% 100%, 0 100%, 0 18px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* the red margin rule down the left, as in a real ledger */
+.wb__ledger::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 28px;
+  width: 1px;
+  background: rgba(206, 86, 70, 0.5);
+}
+
+.wb__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.wb__table thead th {
+  text-align: left;
+  padding: 0 14px 10px 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-ink-dim);
+  border-bottom: 1.5px solid var(--paper-ink);
+}
+
+.wb__table tbody td {
+  padding: 11px 14px 11px 0;
+  color: var(--paper-ink);
+  border-bottom: 1px solid var(--paper-line);
+  vertical-align: middle;
+}
+
+.wb__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.wb__cell-date {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--paper-ink-dim);
+  white-space: nowrap;
+}
+
+.wb__cell-company {
+  font-weight: 700;
+}
+
+/* status select styled onto the paper */
+.wb__select {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--paper-line);
+  border-radius: 2px;
+  padding: 4px 24px 4px 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-ink);
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--paper-ink-dim) 50%),
+    linear-gradient(135deg, var(--paper-ink-dim) 50%, transparent 50%);
+  background-position: right 10px center, right 6px center;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.wb__select:focus-visible {
+  outline: 2px solid var(--thread);
+  outline-offset: 1px;
+}
+
+.wb__snip-ledger {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--paper-ink-dim);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.wb__snip-ledger:hover {
+  color: var(--thread);
+}
+
+.wb__ledger-empty {
+  margin: 8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--paper-ink-dim);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 620px) {
+  :root {
+    --tape: 22px;
+  }
+  .wb__inner {
+    padding: 28px 20px 72px;
+  }
+  .wb__row,
+  .wb__row--dates {
+    grid-template-columns: 1fr;
+  }
+  .wb__tagline {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb {
+    animation: none;
+  }
+}

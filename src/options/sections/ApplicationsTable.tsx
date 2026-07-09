@@ -27,43 +27,67 @@ export default function ApplicationsTable() {
   }
 
   return (
-    <div>
-      <h2>Applications</h2>
-      <button onClick={() => downloadXlsx(records)}>Export .xlsx</button>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Company</th>
-            <th>Title</th>
-            <th>Site</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {records.map((r) => (
-            <tr key={r.id}>
-              <td>{r.dateApplied}</td>
-              <td>{r.company}</td>
-              <td>{r.jobTitle}</td>
-              <td>{r.site}</td>
-              <td>
-                <select value={r.status} onChange={(e) => handleStatusChange(r.id, e.target.value as ApplicationRecord["status"])}>
-                  {STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <button onClick={() => handleDelete(r.id)}>Delete</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className="wb__clause">
+      <div className="wb__clause-head">
+        <span className="wb__clause-no">§ 03</span>
+        <h2 className="wb__clause-title">The Order Book</h2>
+        <span className="wb__clause-rule" aria-hidden="true" />
+      </div>
+      <p className="wb__lede">Every job you've logged, and where it stands.</p>
+
+      <div className="wb__ledger-wrap">
+        <div className="wb__ledger">
+          <table className="wb__table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Company</th>
+                <th>Title</th>
+                <th>Site</th>
+                <th>Status</th>
+                <th aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((r) => (
+                <tr key={r.id}>
+                  <td className="wb__cell-date">{r.dateApplied}</td>
+                  <td className="wb__cell-company">{r.company}</td>
+                  <td>{r.jobTitle}</td>
+                  <td>{r.site}</td>
+                  <td>
+                    <select
+                      className="wb__select"
+                      value={r.status}
+                      onChange={(e) => handleStatusChange(r.id, e.target.value as ApplicationRecord["status"])}
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <button className="wb__snip-ledger" onClick={() => handleDelete(r.id)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {records.length === 0 && (
+            <p className="wb__ledger-empty">No orders yet — tailor a listing to open the book.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="wb__actions">
+        <button className="wb__btn wb__btn--ghost" onClick={() => downloadXlsx(records)}>
+          Export .xlsx
+        </button>
+      </div>
+    </section>
   );
 }

@@ -11,6 +11,8 @@ const EMPTY_PROFILE: MasterProfile = {
   skills: [],
 };
 
+const PIECE_LETTER = (i: number) => String.fromCharCode(65 + (i % 26));
+
 export default function ProfileEditor() {
   const [profile, setProfile] = useState<MasterProfile>(EMPTY_PROFILE);
   const [apiKey, setApiKeyState] = useState<string | null>(null);
@@ -137,83 +139,150 @@ export default function ProfileEditor() {
   }
 
   return (
-    <div>
-      <h2>Master Profile</h2>
-      <label>
-        Import from resume file (.txt or .md — plain text only in v1)
+    <section className="wb__clause">
+      <div className="wb__clause-head">
+        <span className="wb__clause-no">§ 02</span>
+        <h2 className="wb__clause-title">The Pattern Block</h2>
+        <span className="wb__clause-rule" aria-hidden="true" />
+      </div>
+      <p className="wb__lede">
+        Your measurements, taken once. Every tailored résumé is cut from this block — keep it complete
+        and current.
+      </p>
+
+      <label className="wb__import">
+        <span className="wb__import-hint">Import from resume file (.txt or .md — plain text only in v1)</span>
         <input
+          className="wb__file"
           type="file"
           accept=".txt,.md"
           onChange={(e) => e.target.files?.[0] && void handleImport(e.target.files[0])}
         />
       </label>
-      {status === "importing" && <p>Importing…</p>}
+      {status === "importing" && <p className="wb__stamp wb__stamp--work">Importing…</p>}
       {status === "import-failed" && (
-        <p style={{ color: "crimson", whiteSpace: "pre-wrap" }}>
-          Import failed: {importError || "Unknown error."} You can also fill the form manually below.
-        </p>
+        <div className="wb__alert">
+          <span className="wb__alert-label">Import failed</span>
+          <p className="wb__alert-msg">
+            {importError || "Unknown error."} You can also fill the form manually below.
+          </p>
+        </div>
       )}
-      {status === "imported" && <p>Imported — review below, then click Save Profile.</p>}
+      {status === "imported" && <p className="wb__stamp">Imported — review below, then click Save Profile.</p>}
 
-      <fieldset>
-        <legend>Contact</legend>
-        <input
-          placeholder="Full name"
-          value={profile.contact.name}
-          onChange={(e) => setProfile({ ...profile, contact: { ...profile.contact, name: e.target.value } })}
+      <fieldset className="wb__group">
+        <span className="wb__label wb__group-label">Contact</span>
+        <div className="wb__row">
+          <input
+            className="wb__input"
+            placeholder="Full name"
+            value={profile.contact.name}
+            onChange={(e) => setProfile({ ...profile, contact: { ...profile.contact, name: e.target.value } })}
+          />
+          <input
+            className="wb__input"
+            placeholder="Email"
+            value={profile.contact.email}
+            onChange={(e) => setProfile({ ...profile, contact: { ...profile.contact, email: e.target.value } })}
+          />
+        </div>
+      </fieldset>
+
+      <div className="wb__field">
+        <label className="wb__label" htmlFor="wb-summary">
+          Summary
+        </label>
+        <textarea
+          id="wb-summary"
+          className="wb__textarea"
+          value={profile.summary}
+          onChange={(e) => setProfile({ ...profile, summary: e.target.value })}
         />
+      </div>
+
+      <fieldset className="wb__group">
+        <span className="wb__label wb__group-label">Experience</span>
+        <div className="wb__pieces">
+          {profile.experience.map((exp, i) => (
+            <div className="wb__piece" key={i}>
+              <div className="wb__piece-head">
+                <span className="wb__piece-tag">Exp · {PIECE_LETTER(i)}</span>
+                <button className="wb__btn wb__btn--snip" onClick={() => removeExperience(i)}>
+                  Remove
+                </button>
+              </div>
+              <div className="wb__row">
+                <input className="wb__input" placeholder="Company" value={exp.company} onChange={(e) => updateExperience(i, { company: e.target.value })} />
+                <input className="wb__input" placeholder="Title" value={exp.title} onChange={(e) => updateExperience(i, { title: e.target.value })} />
+              </div>
+              <div className="wb__row" style={{ marginTop: 16 }}>
+                <input className="wb__input" placeholder="Start date" value={exp.startDate} onChange={(e) => updateExperience(i, { startDate: e.target.value })} />
+                <input className="wb__input" placeholder="End date" value={exp.endDate} onChange={(e) => updateExperience(i, { endDate: e.target.value })} />
+              </div>
+              <textarea
+                className="wb__textarea"
+                style={{ marginTop: 16 }}
+                placeholder="One bullet per line"
+                value={bulletsDrafts[i] ?? ""}
+                onChange={(e) => updateBulletsDraft(i, e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="wb__actions">
+          <button className="wb__btn wb__btn--ghost" onClick={addExperience}>
+            Add Experience
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset className="wb__group">
+        <span className="wb__label wb__group-label">Education</span>
+        <div className="wb__pieces">
+          {profile.education.map((ed, i) => (
+            <div className="wb__piece" key={i}>
+              <div className="wb__piece-head">
+                <span className="wb__piece-tag">Edu · {PIECE_LETTER(i)}</span>
+                <button className="wb__btn wb__btn--snip" onClick={() => removeEducation(i)}>
+                  Remove
+                </button>
+              </div>
+              <div className="wb__row">
+                <input className="wb__input" placeholder="School" value={ed.school} onChange={(e) => updateEducation(i, { school: e.target.value })} />
+                <input className="wb__input" placeholder="Degree" value={ed.degree} onChange={(e) => updateEducation(i, { degree: e.target.value })} />
+              </div>
+              <div className="wb__row" style={{ marginTop: 16 }}>
+                <input className="wb__input" placeholder="Field" value={ed.field} onChange={(e) => updateEducation(i, { field: e.target.value })} />
+                <input className="wb__input" placeholder="Graduation date" value={ed.gradDate} onChange={(e) => updateEducation(i, { gradDate: e.target.value })} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="wb__actions">
+          <button className="wb__btn wb__btn--ghost" onClick={addEducation}>
+            Add Education
+          </button>
+        </div>
+      </fieldset>
+
+      <div className="wb__field">
+        <label className="wb__label" htmlFor="wb-skills">
+          Skills (comma-separated)
+        </label>
         <input
-          placeholder="Email"
-          value={profile.contact.email}
-          onChange={(e) => setProfile({ ...profile, contact: { ...profile.contact, email: e.target.value } })}
+          id="wb-skills"
+          className="wb__input"
+          value={skillsDraft}
+          onChange={(e) => setSkillsDraft(e.target.value)}
         />
-      </fieldset>
+      </div>
 
-      <label>
-        Summary
-        <textarea value={profile.summary} onChange={(e) => setProfile({ ...profile, summary: e.target.value })} />
-      </label>
-
-      <fieldset>
-        <legend>Experience</legend>
-        {profile.experience.map((exp, i) => (
-          <div key={i}>
-            <input placeholder="Company" value={exp.company} onChange={(e) => updateExperience(i, { company: e.target.value })} />
-            <input placeholder="Title" value={exp.title} onChange={(e) => updateExperience(i, { title: e.target.value })} />
-            <input placeholder="Start date" value={exp.startDate} onChange={(e) => updateExperience(i, { startDate: e.target.value })} />
-            <input placeholder="End date" value={exp.endDate} onChange={(e) => updateExperience(i, { endDate: e.target.value })} />
-            <textarea
-              placeholder="One bullet per line"
-              value={bulletsDrafts[i] ?? ""}
-              onChange={(e) => updateBulletsDraft(i, e.target.value)}
-            />
-            <button onClick={() => removeExperience(i)}>Remove</button>
-          </div>
-        ))}
-        <button onClick={addExperience}>Add Experience</button>
-      </fieldset>
-
-      <fieldset>
-        <legend>Education</legend>
-        {profile.education.map((ed, i) => (
-          <div key={i}>
-            <input placeholder="School" value={ed.school} onChange={(e) => updateEducation(i, { school: e.target.value })} />
-            <input placeholder="Degree" value={ed.degree} onChange={(e) => updateEducation(i, { degree: e.target.value })} />
-            <input placeholder="Field" value={ed.field} onChange={(e) => updateEducation(i, { field: e.target.value })} />
-            <input placeholder="Graduation date" value={ed.gradDate} onChange={(e) => updateEducation(i, { gradDate: e.target.value })} />
-            <button onClick={() => removeEducation(i)}>Remove</button>
-          </div>
-        ))}
-        <button onClick={addEducation}>Add Education</button>
-      </fieldset>
-
-      <label>
-        Skills (comma-separated)
-        <input value={skillsDraft} onChange={(e) => setSkillsDraft(e.target.value)} />
-      </label>
-
-      <button onClick={handleSave}>Save Profile</button>
-      {status === "saved" && <p>Saved.</p>}
-    </div>
+      <div className="wb__actions">
+        <button className="wb__btn wb__btn--primary" onClick={handleSave}>
+          Save Profile
+        </button>
+        {status === "saved" && <p className="wb__stamp">Saved.</p>}
+      </div>
+    </section>
   );
 }
