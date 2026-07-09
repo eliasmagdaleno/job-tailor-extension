@@ -9,6 +9,46 @@ export interface AnthropicMessage {
 const MODEL = "claude-sonnet-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
 
+// JSON Schema mirroring `TailoredOutput`. Passed to the Messages API as a
+// structured-output format so Claude is constrained to emit valid, parseable
+// JSON of exactly this shape — no prose, no fences, no unescaped control
+// characters. This is the root-cause fix for "Claude response did not match
+// the expected resume/coverLetter shape": those failures were the model
+// wrapping or malforming the JSON, which structured outputs prevents by
+// construction. Every object needs `additionalProperties: false` and a
+// `required` list (structured-outputs requirement).
+const TAILORED_OUTPUT_SCHEMA = {
+  type: "object",
+  properties: {
+    resume: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        experience: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              company: { type: "string" },
+              title: { type: "string" },
+              dates: { type: "string" },
+              bullets: { type: "array", items: { type: "string" } },
+            },
+            required: ["company", "title", "dates", "bullets"],
+            additionalProperties: false,
+          },
+        },
+        skills: { type: "array", items: { type: "string" } },
+      },
+      required: ["summary", "experience", "skills"],
+      additionalProperties: false,
+    },
+    coverLetter: { type: "string" },
+  },
+  required: ["resume", "coverLetter"],
+  additionalProperties: false,
+} as const;
+
 export function buildTailorRequest(
   jobData: JobData,
   profile: MasterProfile
@@ -38,7 +78,14 @@ export function buildTailorRequest(
 export function parseTailorResponse(raw: string): TailoredOutput {
   const parsed = safeParseJson(raw);
   if (!parsed || typeof parsed !== "object") {
-    throw new Error("Claude response did not match the expected resume/coverLetter shape");
+    // Include a bounded preview of what actually came back so a parse failure
+    // is diagnosable instead of opaque. Keep the "expected resume/coverLetter
+    // shape" phrasing — callers and tests key off it.
+    const preview = raw.trim().slice(0, 300) || "(empty response)";
+    throw new Error(
+      "Claude response did not match the expected resume/coverLetter shape " +
+        `(could not parse as JSON). Response began: ${preview}`
+    );
   }
 
   const { resume, coverLetter } = parsed as any;
@@ -73,6 +120,9 @@ export async function callClaudeApi(
       max_tokens: 16000,
       system,
       messages,
+      output_config: {
+        format: { type: "json_schema", schema: TAILORED_OUTPUT_SCHEMA },
+      },
     }),
   });
 
