@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import browser from "webextension-polyfill";
 import { getApiKey, getMasterProfile, setMasterProfile } from "../../lib/storage";
+import { extractText } from "../../lib/fileTextExtractor";
 import type { CoverLetterStylePreset, MasterProfile } from "../../lib/types";
 
 const EMPTY_PROFILE: MasterProfile = {
@@ -76,7 +77,7 @@ export default function ProfileEditor() {
     }
     setStatus("importing");
     try {
-      const resumeText = await file.text();
+      const resumeText = await extractText(file);
       const response = (await browser.runtime.sendMessage({
         type: "IMPORT_PROFILE",
         resumeText,
@@ -175,11 +176,11 @@ export default function ProfileEditor() {
       </p>
 
       <label className="wb__import">
-        <span className="wb__import-hint">Import from resume file (.txt or .md — plain text only in v1)</span>
+        <span className="wb__import-hint">Import from resume file (.txt, .md, .pdf, or .docx)</span>
         <input
           className="wb__file"
           type="file"
-          accept=".txt,.md"
+          accept=".txt,.md,.pdf,.docx"
           onChange={(e) => e.target.files?.[0] && void handleImport(e.target.files[0])}
         />
       </label>

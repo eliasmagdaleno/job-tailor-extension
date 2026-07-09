@@ -13,8 +13,14 @@ vi.mock("webextension-polyfill", () => ({
   default: { runtime: { sendMessage: vi.fn() } },
 }));
 
+vi.mock("../src/lib/fileTextExtractor", () => ({
+  extractText: vi.fn(),
+  ExtractionError: class ExtractionError extends Error {},
+}));
+
 import * as storage from "../src/lib/storage";
 import browser from "webextension-polyfill";
+import * as fileTextExtractor from "../src/lib/fileTextExtractor";
 import ApiKeySection from "../src/options/sections/ApiKeySection";
 import ProfileEditor from "../src/options/sections/ProfileEditor";
 import type { MasterProfile } from "../src/lib/types";
@@ -130,9 +136,7 @@ describe("ProfileEditor", () => {
     await waitFor(() => expect(storage.getApiKey).toHaveResolved());
     const fileInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
     const file = new File(["resume text"], "resume.txt", { type: "text/plain" });
-    // jsdom's File/Blob doesn't implement text() — stub it so handleImport's
-    // `await file.text()` resolves as it would in a real browser.
-    file.text = vi.fn().mockResolvedValue("resume text");
+    vi.mocked(fileTextExtractor.extractText).mockResolvedValue("resume text");
 
     await userEvent.upload(fileInput, file);
 
@@ -152,12 +156,56 @@ describe("ProfileEditor", () => {
     await waitFor(() => expect(storage.getApiKey).toHaveResolved());
     const fileInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
     const file = new File(["resume text"], "resume.txt", { type: "text/plain" });
-    file.text = vi.fn().mockResolvedValue("resume text");
+    vi.mocked(fileTextExtractor.extractText).mockResolvedValue("resume text");
 
     await userEvent.upload(fileInput, file);
 
     expect(
       await screen.findByText(/Claude API error \(400\): credit balance too low/)
+    ).toBeInTheDocument();
+    expect(storage.setMasterProfile).not.toHaveBeenCalled();
+  });
+
+  it("imports a .pdf resume by routing it through extractText first", async () => {
+    const importedProfile: MasterProfile = {
+      contact: { name: "PDF Name", email: "pdf@example.com" },
+      summary: "",
+      experience: [],
+      education: [],
+      skills: [],
+    };
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(fileTextExtractor.extractText).mockResolvedValue("## PDF Name\n\nExtracted resume text.");
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({ ok: true, data: importedProfile });
+
+    render(<ProfileEditor />);
+    await waitFor(() => expect(storage.getApiKey).toHaveResolved());
+    const fileInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
+    const file = new File([], "resume.pdf", { type: "application/pdf" });
+
+    await userEvent.upload(fileInput, file);
+
+    expect(await screen.findByText("Imported — review below, then click Save Profile.")).toBeInTheDocument();
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ resumeText: "## PDF Name\n\nExtracted resume text." })
+    );
+  });
+
+  it("surfaces an ExtractionError message from a bad PDF/docx upload", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(fileTextExtractor.extractText).mockRejectedValue(
+      new fileTextExtractor.ExtractionError("This PDF is password-protected. Remove the password or export as .txt/.md.")
+    );
+
+    render(<ProfileEditor />);
+    await waitFor(() => expect(storage.getApiKey).toHaveResolved());
+    const fileInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
+    const file = new File([], "resume.pdf", { type: "application/pdf" });
+
+    await userEvent.upload(fileInput, file);
+
+    expect(
+      await screen.findByText(/This PDF is password-protected\. Remove the password or export as \.txt\/\.md\./)
     ).toBeInTheDocument();
     expect(storage.setMasterProfile).not.toHaveBeenCalled();
   });
