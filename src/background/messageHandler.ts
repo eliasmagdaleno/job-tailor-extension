@@ -1,12 +1,13 @@
 import { buildTailorRequest, parseTailorResponse, type AnthropicMessage } from "../lib/anthropicClient";
 import { buildProfileImportRequest, parseProfileImportResponse } from "../lib/profileImport";
-import type { JobData, MasterProfile, TailoredOutput } from "../lib/types";
+import type { GenerationParts, JobData, MasterProfile, TailoredOutput } from "../lib/types";
 
 export interface GenerateTailoredMessage {
   type: "GENERATE_TAILORED";
   jobData: JobData;
   profile: MasterProfile;
   apiKey: string;
+  parts: GenerationParts;
 }
 
 export interface ImportProfileMessage {
@@ -20,7 +21,8 @@ export type BackgroundMessage = GenerateTailoredMessage | ImportProfileMessage;
 export type CallClaudeApiFn = (
   apiKey: string,
   system: string,
-  messages: AnthropicMessage[]
+  messages: AnthropicMessage[],
+  schema?: object
 ) => Promise<string>;
 
 export async function handleMessage(
@@ -29,13 +31,14 @@ export async function handleMessage(
 ): Promise<{ ok: true; data: TailoredOutput | MasterProfile } | { ok: false; error: string }> {
   try {
     if (message.type === "GENERATE_TAILORED") {
-      const { system, messages } = buildTailorRequest(message.jobData, message.profile);
-      const raw = await callClaudeApi(message.apiKey, system, messages);
-      return { ok: true, data: parseTailorResponse(raw) };
+      const { system, messages, schema } = buildTailorRequest(message.jobData, message.profile, message.parts);
+      const raw = await callClaudeApi(message.apiKey, system, messages, schema);
+      return { ok: true, data: parseTailorResponse(raw, message.parts) };
     }
     if (message.type === "IMPORT_PROFILE") {
       const { system, messages } = buildProfileImportRequest(message.resumeText);
-      const raw = await callClaudeApi(message.apiKey, system, messages);
+      // No schema: profile import must NOT be constrained to the résumé shape.
+      const raw = await callClaudeApi(message.apiKey, system, messages, undefined);
       return { ok: true, data: parseProfileImportResponse(raw) };
     }
     return { ok: false, error: `Unknown message type: ${(message as { type: string }).type}` };

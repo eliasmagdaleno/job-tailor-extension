@@ -25,11 +25,17 @@ describe("handleMessage", () => {
       JSON.stringify({ resume: { summary: "S", experience: [], skills: [] }, coverLetter: "C" })
     );
     const result = await handleMessage(
-      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test" },
+      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test", parts: { resume: true, coverLetter: true } },
       callClaudeApi
     );
     expect(result).toEqual({ ok: true, data: { resume: { summary: "S", experience: [], skills: [] }, coverLetter: "C" } });
-    expect(callClaudeApi).toHaveBeenCalledWith("sk-ant-test", expect.any(String), expect.any(Array));
+    // schema (4th arg) is forwarded for generation
+    expect(callClaudeApi).toHaveBeenCalledWith(
+      "sk-ant-test",
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ type: "object" })
+    );
   });
 
   it("imports a profile on IMPORT_PROFILE", async () => {
@@ -41,12 +47,21 @@ describe("handleMessage", () => {
     expect(result).toEqual({ ok: true, data: profile });
   });
 
+  it("passes no schema on IMPORT_PROFILE", async () => {
+    const callClaudeApi = vi.fn(async () => JSON.stringify(profile));
+    await handleMessage(
+      { type: "IMPORT_PROFILE", resumeText: "Jane Doe...", apiKey: "sk-ant-test" },
+      callClaudeApi
+    );
+    expect(callClaudeApi).toHaveBeenCalledWith("sk-ant-test", expect.any(String), expect.any(Array), undefined);
+  });
+
   it("returns ok:false when the Claude call throws", async () => {
     const callClaudeApi = vi.fn(async () => {
       throw new Error("network down");
     });
     const result = await handleMessage(
-      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test" },
+      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test", parts: { resume: true, coverLetter: true } },
       callClaudeApi
     );
     expect(result).toEqual({ ok: false, error: "network down" });
