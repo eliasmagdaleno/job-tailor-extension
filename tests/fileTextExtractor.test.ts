@@ -14,6 +14,7 @@ import {
   linesToMarkdown,
   extractDocxMarkdown,
   extractPdfMarkdown,
+  extractText,
   ExtractionError,
   type ExtractedLine,
 } from "../src/lib/fileTextExtractor";
@@ -210,5 +211,51 @@ describe("extractPdfMarkdown", () => {
     } as ReturnType<typeof pdfjs.getDocument>);
 
     await expect(extractPdfMarkdown(new ArrayBuffer(8))).rejects.toThrow(/scanned image/i);
+  });
+});
+
+describe("extractText", () => {
+  it("routes .txt/.md files through file.text(), unchanged", async () => {
+    const file = new File(["plain resume text"], "resume.txt", { type: "text/plain" });
+    file.text = vi.fn().mockResolvedValue("plain resume text");
+
+    await expect(extractText(file)).resolves.toBe("plain resume text");
+  });
+
+  it("routes .docx files through extractDocxMarkdown", async () => {
+    vi.mocked(mammoth.convertToHtml).mockResolvedValue({
+      value: "<p>Jane Doe, a software engineer with five years of experience.</p>",
+      messages: [],
+    });
+    const file = new File([], "resume.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    file.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+
+    await expect(extractText(file)).resolves.toContain("Jane Doe");
+  });
+
+  it("routes .pdf files through extractPdfMarkdown", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.resolve(
+        makeFakePdfDoc([[{ str: "Jane Doe, a software engineer with five years of experience.", fontSize: 10, hasEOL: true }]])
+      ),
+    } as ReturnType<typeof pdfjs.getDocument>);
+    const file = new File([], "resume.pdf", { type: "application/pdf" });
+    file.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+
+    await expect(extractText(file)).resolves.toContain("Jane Doe");
+  });
+
+  it("routes an uppercase .PDF extension through extractPdfMarkdown", async () => {
+    vi.mocked(pdfjs.getDocument).mockReturnValue({
+      promise: Promise.resolve(
+        makeFakePdfDoc([[{ str: "Jane Doe, a software engineer with five years of experience.", fontSize: 10, hasEOL: true }]])
+      ),
+    } as ReturnType<typeof pdfjs.getDocument>);
+    const file = new File([], "RESUME.PDF", { type: "application/pdf" });
+    file.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+
+    await expect(extractText(file)).resolves.toContain("Jane Doe");
   });
 });

@@ -118,3 +118,14 @@ export async function extractPdfMarkdown(buffer: ArrayBuffer): Promise<string> {
 
   return markdown;
 }
+
+export async function extractText(file: File): Promise<string> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) {
+    return extractPdfMarkdown(await file.arrayBuffer());
+  }
+  if (name.endsWith(".docx")) {
+    return extractDocxMarkdown(await file.arrayBuffer());
+  }
+  return file.text();
+}
