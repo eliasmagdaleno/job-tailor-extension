@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import browser from "webextension-polyfill";
-import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication } from "../lib/storage";
+import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication, getGenerationStatus } from "../lib/storage";
 import { renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
 import { downloadResumePdf } from "../lib/resumePdf";
 import type { GenerationParts, JobData, MasterProfile, TailoredOutput } from "../lib/types";
@@ -25,6 +25,7 @@ type PopupState =
       // "no-job": the content script ran but found no listing on the page.
       unavailable: "unsupported-page" | "no-job" | null;
       alreadyLoggedOn: string | null; // dateApplied of the existing record, if any
+      cancelledNotice?: boolean;
     }
   | {
       step: "generating";
@@ -94,6 +95,43 @@ export default function Popup() {
     void bootstrap();
   }, []);
 
+  useEffect(() => {
+    if (state.step !== "generating") return;
+    const generatingState = state;
+
+    function onStorageChanged(changes: Record<string, { newValue?: unknown }>, areaName: string) {
+      if (areaName !== "local") return;
+      const next = changes.generationStatus?.newValue as
+        | {
+            phase: "running" | "done" | "error" | "cancelled";
+            jobData: JobData;
+            parts: GenerationParts;
+            output?: TailoredOutput;
+            message?: string;
+          }
+        | undefined;
+      if (!next || next.phase === "running") return;
+      const { apiKey, profile, jobData, alreadyLoggedOn } = generatingState;
+      if (next.phase === "done") {
+        setState({ step: "generated", apiKey, profile, jobData, output: next.output!, alreadyLoggedOn });
+      } else if (next.phase === "error") {
+        setState({
+          step: "error",
+          message: next.message!,
+          // Uses the persisted parts from storage, not the popup's own `choice`
+          // state — this listener path only matters for a reconnected instance
+          // that never chose anything itself (its `choice` is just the default).
+          retry: () => void handleGenerate(jobData, next.parts),
+        });
+      } else {
+        setState({ step: "ready", apiKey, profile, jobData, unavailable: null, alreadyLoggedOn, cancelledNotice: true });
+      }
+    }
+
+    browser.storage.onChanged.addListener(onStorageChanged);
+    return () => browser.storage.onChanged.removeListener(onStorageChanged);
+  }, [state]);
+
   async function bootstrap() {
     const apiKey = await getApiKey();
     if (!apiKey) {
@@ -105,6 +143,41 @@ export default function Popup() {
       setState({ step: "setup-required", missing: "profile" });
       return;
     }
+    const generationStatus = await getGenerationStatus();
+    if (generationStatus?.phase === "running") {
+      const alreadyLoggedOn =
+        (await findApplicationByUrl(generationStatus.jobData.url))?.dateApplied ?? null;
+      setState({
+        step: "generating",
+        apiKey,
+        profile,
+        jobData: generationStatus.jobData,
+        alreadyLoggedOn,
+      });
+      return;
+    }
+    if (generationStatus?.phase === "done") {
+      const alreadyLoggedOn =
+        (await findApplicationByUrl(generationStatus.jobData.url))?.dateApplied ?? null;
+      setState({
+        step: "generated",
+        apiKey,
+        profile,
+        jobData: generationStatus.jobData,
+        output: generationStatus.output,
+        alreadyLoggedOn,
+      });
+      return;
+    }
+    if (generationStatus?.phase === "error") {
+      setState({
+        step: "error",
+        message: generationStatus.message,
+        retry: () => void handleGenerate(generationStatus.jobData, generationStatus.parts),
+      });
+      return;
+    }
+
     const parsed = await parseCurrentTab();
     const jobData = parsed.kind === "found" ? parsed.jobData : null;
     const alreadyLoggedOn = jobData
@@ -178,9 +251,24 @@ export default function Popup() {
         output: response.data,
         alreadyLoggedOn: existing?.dateApplied ?? null,
       });
+    } else if (response.error === "cancelled") {
+      setState({
+        step: "ready",
+        apiKey,
+        profile,
+        jobData,
+        unavailable: null,
+        alreadyLoggedOn,
+        cancelledNotice: true,
+      });
     } else {
       setState({ step: "error", message: response.error, retry: () => void handleGenerate(jobData, parts) });
     }
+  }
+
+  async function handleCancel() {
+    if (state.step !== "generating") return;
+    await browser.runtime.sendMessage({ type: "CANCEL_GENERATION" });
   }
 
   async function handleMarkAsApplied() {
@@ -291,6 +379,7 @@ export default function Popup() {
         {state.alreadyLoggedOn && (
           <p className="jt__stamp">Already logged on {state.alreadyLoggedOn}.</p>
         )}
+        {state.cancelledNotice && <p className="jt__note">Generation cancelled.</p>}
         <fieldset className="jt__choice" role="radiogroup" aria-label="What to generate">
           {(["resume", "coverLetter", "both"] as const).map((value) => (
             <label key={value} className="jt__choice-opt">
@@ -343,9 +432,17 @@ export default function Popup() {
           <span>Tailoring</span>
           <span className="jt__stitch" aria-hidden="true" />
         </div>
+        <div className="jt__progress" role="progressbar" aria-label="Generating">
+          <div className="jt__progress-bar" />
+        </div>
         <p className="jt__note">
           Cutting the résumé and cover letter to fit this listing.
         </p>
+        <div className="jt__actions">
+          <button className="jt__btn jt__btn--ghost" onClick={handleCancel}>
+            Cancel
+          </button>
+        </div>
       </Frame>
     );
   }

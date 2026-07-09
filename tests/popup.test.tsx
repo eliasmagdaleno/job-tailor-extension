@@ -7,6 +7,7 @@ vi.mock("../src/lib/storage", () => ({
   getMasterProfile: vi.fn(),
   findApplicationByUrl: vi.fn(),
   addApplication: vi.fn(),
+  getGenerationStatus: vi.fn(),
 }));
 
 vi.mock("webextension-polyfill", () => ({
@@ -19,6 +20,12 @@ vi.mock("webextension-polyfill", () => ({
       sendMessage: vi.fn(),
       openOptionsPage: vi.fn(),
     },
+    storage: {
+      onChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    },
   },
 }));
 
@@ -28,6 +35,11 @@ import Popup from "../src/popup/Popup";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // vi.clearAllMocks() clears call history but not a previously-configured
+  // mockResolvedValue, so without this, a test that sets getGenerationStatus
+  // to a "done"/"running" status would leak that into the next test. Default
+  // back to "no persisted status" every time; individual tests override it.
+  vi.mocked(storage.getGenerationStatus).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -385,5 +397,175 @@ describe("Popup", () => {
     const gear = await screen.findByRole("button", { name: /settings|edit profile/i });
     fireEvent.click(gear);
     expect(browser.runtime.openOptionsPage).toHaveBeenCalled();
+  });
+
+  it("reconnects into the generating step when a generation is already running in storage", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(storage.getGenerationStatus).mockResolvedValue({
+      phase: "running",
+      jobData: {
+        title: "Product Designer",
+        company: "Acme",
+        description: "desc",
+        url: "https://example.com/job/1",
+        site: "Welcome to the Jungle",
+        parsedVia: "structured",
+      },
+      parts: { resume: true, coverLetter: true },
+      startedAt: Date.now(),
+    });
+
+    render(<Popup />);
+    expect(await screen.findByText("Tailoring")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    // reconnecting must not re-parse the tab or start a second generation
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("reconnects into the generated step when a generation finished while the popup was closed", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(storage.getGenerationStatus).mockResolvedValue({
+      phase: "done",
+      jobData: {
+        title: "Product Designer",
+        company: "Acme",
+        description: "desc",
+        url: "https://example.com/job/1",
+        site: "Welcome to the Jungle",
+        parsedVia: "structured",
+      },
+      parts: { resume: true, coverLetter: true },
+      output: {
+        resume: { summary: "Tailored summary", experience: [], skills: [] },
+        coverLetter: "Dear hiring team,",
+      },
+    });
+
+    render(<Popup />);
+    expect(await screen.findByText("Preview")).toBeInTheDocument();
+    expect(screen.getByText("Tailored summary")).toBeInTheDocument();
+  });
+
+  it("shows a progress bar while generating", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockImplementation(() => new Promise(() => {}));
+
+    render(<Popup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Generate" }));
+
+    expect(await screen.findByRole("progressbar")).toBeInTheDocument();
+  });
+
+  it("returns to ready with a cancelled notice when the generation request resolves as cancelled", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({ ok: false, error: "cancelled" });
+
+    render(<Popup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Generate" }));
+
+    expect(await screen.findByText("Generation cancelled.")).toBeInTheDocument();
+    // lands back on the ready screen, not the error/"Snag" screen
+    expect(screen.queryByText("Snag")).toBeNull();
+  });
+
+  it("cancels an in-flight generation via storage.onChanged for a reconnected popup", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    const runningJobData = {
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle" as const,
+      parsedVia: "structured" as const,
+    };
+    vi.mocked(storage.getGenerationStatus).mockResolvedValue({
+      phase: "running",
+      jobData: runningJobData,
+      parts: { resume: true, coverLetter: true },
+      startedAt: Date.now(),
+    });
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({ ok: true });
+
+    render(<Popup />);
+    const cancelButton = await screen.findByRole("button", { name: "Cancel" });
+    fireEvent.click(cancelButton);
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith({ type: "CANCEL_GENERATION" });
+
+    const addListenerCalls = vi.mocked(browser.storage.onChanged.addListener).mock.calls;
+    const listener = addListenerCalls[addListenerCalls.length - 1][0] as (
+      changes: Record<string, { newValue?: unknown }>,
+      areaName: string
+    ) => void;
+    listener(
+      {
+        generationStatus: {
+          newValue: {
+            phase: "cancelled",
+            jobData: runningJobData,
+            parts: { resume: true, coverLetter: true },
+          },
+        },
+      },
+      "local"
+    );
+
+    expect(await screen.findByText("Generation cancelled.")).toBeInTheDocument();
   });
 });
