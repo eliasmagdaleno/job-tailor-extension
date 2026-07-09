@@ -140,6 +140,38 @@ describe("Popup", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
+  it("explains the page is unsupported when no content script responds", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "Product designer with 5 years of experience.",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(browser.tabs.sendMessage).mockRejectedValue(
+      new Error("Could not establish connection. Receiving end does not exist.")
+    );
+
+    render(<Popup />);
+    expect(await screen.findByText(/doesn't look like a Welcome to the Jungle job page/i)).toBeInTheDocument();
+  });
+
+  it("explains no listing was found when the content script returns nothing", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "Product designer with 5 years of experience.",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue(null);
+
+    render(<Popup />);
+    expect(await screen.findByText(/Couldn't find a job listing on this page/i)).toBeInTheDocument();
+  });
+
   it("prompts for profile setup when the saved profile is empty", async () => {
     vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
     vi.mocked(storage.getMasterProfile).mockResolvedValue({
