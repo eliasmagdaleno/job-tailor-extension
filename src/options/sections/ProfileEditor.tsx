@@ -404,6 +404,7 @@ export default function ProfileEditor() {
                 try {
                   const text = await extractText(file);
                   setProfile({ ...profile, coverLetterReference: text });
+                  setStatus("idle");
                 } catch (err) {
                   setImportError(err instanceof Error ? err.message : String(err));
                   setStatus("import-failed");

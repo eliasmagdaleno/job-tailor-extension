@@ -252,4 +252,27 @@ describe("ProfileEditor", () => {
       await screen.findByText(/This PDF is password-protected\. Remove the password or export as \.txt\/\.md\./)
     ).toBeInTheDocument();
   });
+
+  it("clears a stale import-failed alert after a later successful cover-letter upload", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(fileTextExtractor.extractText)
+      .mockRejectedValueOnce(new fileTextExtractor.ExtractionError("This PDF is password-protected."))
+      .mockResolvedValueOnce("Dear Hiring Manager, I'm excited to apply.");
+
+    render(<ProfileEditor />);
+    await waitFor(() => expect(storage.getApiKey).toHaveResolved());
+
+    // First, an unrelated failed resume import leaves the alert showing.
+    const resumeInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
+    await userEvent.upload(resumeInput, new File([], "resume.pdf", { type: "application/pdf" }));
+    expect(await screen.findByText(/This PDF is password-protected\./)).toBeInTheDocument();
+
+    // Then a successful cover-letter upload should clear that stale alert.
+    const coverLetterInput = (await screen.findByLabelText(/Or upload a file/)) as HTMLInputElement;
+    await userEvent.upload(coverLetterInput, new File([], "cover-letter.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/This PDF is password-protected\./)).not.toBeInTheDocument()
+    );
+  });
 });
