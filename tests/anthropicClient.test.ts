@@ -227,4 +227,19 @@ describe("callClaudeApi", () => {
       callClaudeApi("sk-ant-test", "system prompt", [{ role: "user", content: "hi" }])
     ).rejects.toThrow(/cut off/);
   });
+
+  it("forwards an AbortSignal to fetch when provided", async () => {
+    const controller = new AbortController();
+    await callClaudeApi(
+      "sk-ant-test",
+      "system prompt",
+      [{ role: "user", content: "hi" }],
+      undefined,
+      controller.signal
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/messages",
+      expect.objectContaining({ signal: controller.signal })
+    );
+  });
 });

@@ -169,7 +169,8 @@ export async function callClaudeApi(
   apiKey: string,
   system: string,
   messages: AnthropicMessage[],
-  schema?: object
+  schema?: object,
+  signal?: AbortSignal
 ): Promise<string> {
   const body: Record<string, unknown> = {
     model: MODEL,
@@ -190,6 +191,7 @@ export async function callClaudeApi(
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!response.ok) {
