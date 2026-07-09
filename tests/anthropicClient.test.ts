@@ -88,6 +88,67 @@ describe("buildTailorRequest parts", () => {
   });
 });
 
+describe("buildTailorRequest cover letter options", () => {
+  const styledProfile: MasterProfile = {
+    ...profile,
+    coverLetterStyle: { preset: "enthusiastic", customNotes: "Keep it upbeat but not cheesy." },
+    coverLetterReference: "Dear Sir or Madam, I am writing to express my sincere interest...",
+    snippets: ["I've been passionate about accessible design since college."],
+  };
+
+  it("never includes style, snippets, or reference in a résumé-only request", () => {
+    const { system, messages } = buildTailorRequest(jobData, styledProfile, { resume: true, coverLetter: false });
+    expect(system).not.toContain("enthusiastic");
+    expect(system).not.toContain("Keep it upbeat");
+    expect(messages[0].content).not.toContain("snippets");
+    expect(messages[0].content).not.toContain("referenceCoverLetter");
+    expect(messages[0].content).not.toContain("Dear Sir or Madam");
+  });
+
+  it("includes the style preset instruction in the system prompt for a cover letter request", () => {
+    const { system } = buildTailorRequest(jobData, styledProfile, { resume: false, coverLetter: true });
+    expect(system).toContain("enthusiastic tone");
+  });
+
+  it("includes custom style notes in the system prompt when set", () => {
+    const { system } = buildTailorRequest(jobData, styledProfile, { resume: false, coverLetter: true });
+    expect(system).toContain("Keep it upbeat but not cheesy.");
+  });
+
+  it("includes persistent snippets in the user message for a cover letter request", () => {
+    const { messages } = buildTailorRequest(jobData, styledProfile, { resume: false, coverLetter: true });
+    const parsed = JSON.parse(messages[0].content);
+    expect(parsed.candidateProfile.snippets).toEqual([
+      "I've been passionate about accessible design since college.",
+    ]);
+  });
+
+  it("includes the reference cover letter only when includeReference is true", () => {
+    const { messages } = buildTailorRequest(jobData, styledProfile, { resume: false, coverLetter: true }, {
+      includeReference: true,
+    });
+    const parsed = JSON.parse(messages[0].content);
+    expect(parsed.candidateProfile.referenceCoverLetter).toContain("Dear Sir or Madam");
+  });
+
+  it("omits the reference cover letter when includeReference is false, even if the profile has one saved", () => {
+    const { messages, system } = buildTailorRequest(jobData, styledProfile, { resume: false, coverLetter: true }, {
+      includeReference: false,
+    });
+    const parsed = JSON.parse(messages[0].content);
+    expect(parsed.candidateProfile.referenceCoverLetter).toBeUndefined();
+    expect(system).not.toContain("Dear Sir or Madam");
+  });
+
+  it("includes a one-off job-specific note when provided", () => {
+    const { messages } = buildTailorRequest(jobData, profile, { resume: false, coverLetter: true }, {
+      oneOffNote: "I used their product as a customer for two years.",
+    });
+    const parsed = JSON.parse(messages[0].content);
+    expect(parsed.candidateProfile.jobSpecificNote).toBe("I used their product as a customer for two years.");
+  });
+});
+
 describe("parseTailorResponse parts", () => {
   it("parses a cover-letter-only response without requiring résumé fields", () => {
     const raw = JSON.stringify({ coverLetter: "Dear team," });

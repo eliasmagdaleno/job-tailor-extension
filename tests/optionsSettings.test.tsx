@@ -77,6 +77,42 @@ describe("ProfileEditor", () => {
     );
   });
 
+  it("saves a selected style preset with custom notes", async () => {
+    render(<ProfileEditor />);
+    const presetSelect = await screen.findByLabelText("Style");
+    await userEvent.selectOptions(presetSelect, "formal");
+    await userEvent.type(
+      screen.getByPlaceholderText(/refine the tone/i),
+      "Keep it upbeat but not cheesy."
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    expect(storage.setMasterProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coverLetterStyle: { preset: "formal", customNotes: "Keep it upbeat but not cheesy." },
+      })
+    );
+  });
+
+  it("saves a pasted reference cover letter", async () => {
+    render(<ProfileEditor />);
+    const referenceTextarea = await screen.findByLabelText(/Reference cover letter/i);
+    await userEvent.type(referenceTextarea, "Dear Sir or Madam,");
+    await userEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    expect(storage.setMasterProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ coverLetterReference: "Dear Sir or Madam," })
+    );
+  });
+
+  it("adds and removes a snippet", async () => {
+    render(<ProfileEditor />);
+    const snippetInput = await screen.findByPlaceholderText(/Type a snippet/i);
+    await userEvent.type(snippetInput, "Passionate about accessible design{enter}");
+    expect(screen.getByText("Passionate about accessible design")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove Passionate about accessible design" }));
+    expect(screen.queryByText("Passionate about accessible design")).not.toBeInTheDocument();
+  });
+
   it("shows an import-review status and does not persist until Save is clicked", async () => {
     const importedProfile: MasterProfile = {
       contact: { name: "Imported Name", email: "imported@example.com" },

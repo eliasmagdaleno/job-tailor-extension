@@ -8,6 +8,8 @@ export interface JobData {
   parsedVia: "structured" | "fallback";
 }
 
+export type CoverLetterStylePreset = "formal" | "conversational" | "enthusiastic" | "direct";
+
 export interface MasterProfile {
   contact: {
     name: string;
@@ -32,6 +34,12 @@ export interface MasterProfile {
     gradDate: string;
   }>;
   skills: string[];
+  coverLetterStyle?: {
+    preset: CoverLetterStylePreset;
+    customNotes?: string;
+  };
+  coverLetterReference?: string;
+  snippets?: string[];
 }
 
 export interface GenerationParts {

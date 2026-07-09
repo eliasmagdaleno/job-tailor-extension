@@ -87,6 +87,8 @@ export default function Popup() {
   const [logging, setLogging] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [choice, setChoice] = useState<Choice>("both");
+  const [includeReference, setIncludeReference] = useState(false);
+  const [oneOffNote, setOneOffNote] = useState("");
 
   useEffect(() => {
     void bootstrap();
@@ -143,6 +145,10 @@ export default function Popup() {
     const { apiKey, profile, alreadyLoggedOn } = state;
     setState({ step: "generating", apiKey, profile, jobData, alreadyLoggedOn });
 
+    const coverLetterOptions = parts.coverLetter
+      ? { includeReference, oneOffNote: oneOffNote.trim() || undefined }
+      : undefined;
+
     let response: { ok: true; data: TailoredOutput } | { ok: false; error: string };
     try {
       response = (await browser.runtime.sendMessage({
@@ -151,6 +157,7 @@ export default function Popup() {
         profile,
         apiKey,
         parts,
+        coverLetterOptions,
       })) as { ok: true; data: TailoredOutput } | { ok: false; error: string };
     } catch (err) {
       setState({
@@ -297,6 +304,26 @@ export default function Popup() {
             </label>
           ))}
         </fieldset>
+        {choice !== "resume" && (
+          <div className="jt__cover-options">
+            {state.profile.coverLetterReference && (
+              <label className="jt__choice-opt">
+                <input
+                  type="checkbox"
+                  checked={includeReference}
+                  onChange={(e) => setIncludeReference(e.target.checked)}
+                />
+                <span>Match my reference letter's voice</span>
+              </label>
+            )}
+            <textarea
+              className="jt__note"
+              placeholder="Anything specific to mention for this job? (optional)"
+              value={oneOffNote}
+              onChange={(e) => setOneOffNote(e.target.value)}
+            />
+          </div>
+        )}
         <div className="jt__actions">
           <button
             className="jt__btn jt__btn--primary"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import browser from "webextension-polyfill";
 import { getApiKey, getMasterProfile, setMasterProfile } from "../../lib/storage";
-import type { MasterProfile } from "../../lib/types";
+import type { CoverLetterStylePreset, MasterProfile } from "../../lib/types";
 
 const EMPTY_PROFILE: MasterProfile = {
   contact: { name: "", email: "" },
@@ -12,6 +12,13 @@ const EMPTY_PROFILE: MasterProfile = {
 };
 
 const PIECE_LETTER = (i: number) => String.fromCharCode(65 + (i % 26));
+
+const STYLE_PRESETS: Array<{ value: CoverLetterStylePreset; label: string }> = [
+  { value: "formal", label: "Formal" },
+  { value: "conversational", label: "Conversational" },
+  { value: "enthusiastic", label: "Enthusiastic" },
+  { value: "direct", label: "Direct" },
+];
 
 export default function ProfileEditor() {
   const [profile, setProfile] = useState<MasterProfile>(EMPTY_PROFILE);
@@ -27,6 +34,7 @@ export default function ProfileEditor() {
   // filtered array on every change. Normalized into `profile` on save.
   const [bulletsDrafts, setBulletsDrafts] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState<string>("");
+  const [snippetInput, setSnippetInput] = useState<string>("");
 
   function resetDrafts(p: MasterProfile) {
     setBulletsDrafts(p.experience.map((exp) => exp.bullets.join("\n")));
@@ -142,6 +150,17 @@ export default function ProfileEditor() {
 
   function removeSkill(index: number) {
     setProfile({ ...profile, skills: profile.skills.filter((_, i) => i !== index) });
+  }
+
+  function addSnippet() {
+    const snippet = snippetInput.trim();
+    if (!snippet) return;
+    setProfile({ ...profile, snippets: [...(profile.snippets ?? []), snippet] });
+    setSnippetInput("");
+  }
+
+  function removeSnippet(index: number) {
+    setProfile({ ...profile, snippets: (profile.snippets ?? []).filter((_, i) => i !== index) });
   }
 
   return (
@@ -308,6 +327,128 @@ export default function ProfileEditor() {
           onBlur={addSkill}
         />
       </div>
+
+      <fieldset className="wb__group">
+        <span className="wb__label wb__group-label">Cover Letter Voice</span>
+
+        <div className="wb__field">
+          <label className="wb__label" htmlFor="wb-style-preset">
+            Style
+          </label>
+          <select
+            id="wb-style-preset"
+            className="wb__input"
+            value={profile.coverLetterStyle?.preset ?? ""}
+            onChange={(e) => {
+              const value = e.target.value as CoverLetterStylePreset | "";
+              setProfile({
+                ...profile,
+                coverLetterStyle: value
+                  ? { ...profile.coverLetterStyle, preset: value }
+                  : undefined,
+              });
+            }}
+          >
+            <option value="">No preference</option>
+            {STYLE_PRESETS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="wb__field">
+          <textarea
+            className="wb__textarea"
+            placeholder='Optional notes to refine the tone (e.g. "keep it upbeat but not cheesy")'
+            value={profile.coverLetterStyle?.customNotes ?? ""}
+            onChange={(e) =>
+              setProfile({
+                ...profile,
+                coverLetterStyle: {
+                  preset: profile.coverLetterStyle?.preset ?? "conversational",
+                  customNotes: e.target.value,
+                },
+              })
+            }
+          />
+        </div>
+
+        <div className="wb__field">
+          <label className="wb__label" htmlFor="wb-reference-letter">
+            Reference cover letter
+          </label>
+          <p className="wb__lede">
+            Paste or upload a cover letter you've written before. In the popup, you can opt in to
+            having new cover letters match its voice.
+          </p>
+          <textarea
+            id="wb-reference-letter"
+            className="wb__textarea"
+            placeholder="Paste a previous cover letter here..."
+            value={profile.coverLetterReference ?? ""}
+            onChange={(e) => setProfile({ ...profile, coverLetterReference: e.target.value })}
+          />
+          <label className="wb__import">
+            <span className="wb__import-hint">Or upload a file (.txt or .md)</span>
+            <input
+              className="wb__file"
+              type="file"
+              accept=".txt,.md"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const text = await file.text();
+                setProfile({ ...profile, coverLetterReference: text });
+              }}
+            />
+          </label>
+        </div>
+
+        <div className="wb__field">
+          <label className="wb__label" htmlFor="wb-snippets">
+            Snippets
+          </label>
+          <p className="wb__lede">
+            Short notes — why you're passionate about this field, background details — to draw on
+            when writing cover letters.
+          </p>
+          {(profile.snippets?.length ?? 0) > 0 ? (
+            <div className="wb__skills-wrap">
+              {profile.snippets!.map((snippet, i) => (
+                <span className="wb__skill-chip" key={`${snippet}-${i}`}>
+                  {snippet}
+                  <button
+                    type="button"
+                    className="wb__skill-remove"
+                    aria-label={`Remove ${snippet}`}
+                    onClick={() => removeSnippet(i)}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="wb__skills-empty">No snippets added yet.</p>
+          )}
+          <input
+            id="wb-snippets"
+            className="wb__input"
+            placeholder="Type a snippet and press Enter"
+            value={snippetInput}
+            onChange={(e) => setSnippetInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addSnippet();
+              }
+            }}
+            onBlur={addSnippet}
+          />
+        </div>
+      </fieldset>
 
       <div className="wb__actions">
         <button className="wb__btn wb__btn--primary" onClick={handleSave}>

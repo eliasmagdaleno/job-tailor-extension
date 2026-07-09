@@ -56,7 +56,8 @@ export function buildTailoredOutputSchema(parts: GenerationParts) {
 export function buildTailorRequest(
   jobData: JobData,
   profile: MasterProfile,
-  parts: GenerationParts = BOTH
+  parts: GenerationParts = BOTH,
+  coverLetterOptions?: { includeReference?: boolean; oneOffNote?: string }
 ): { system: string; messages: AnthropicMessage[]; schema: object } {
   const wants: string[] = [];
   if (parts.resume) {
@@ -67,7 +68,7 @@ export function buildTailorRequest(
   }
   if (parts.coverLetter) wants.push('"coverLetter": string');
 
-  const system =
+  let system =
     "You are an expert resume writer. Given a job listing and a candidate's " +
     "master profile, select and lightly rewrite the most relevant experience " +
     "bullets" +
@@ -77,6 +78,43 @@ export function buildTailorRequest(
     wants.join(", ") +
     " }";
 
+  const candidateProfile: Record<string, unknown> = {
+    contact: profile.contact,
+    summary: profile.summary,
+    experience: profile.experience,
+    education: profile.education,
+    skills: profile.skills,
+  };
+
+  const includeReference = Boolean(coverLetterOptions?.includeReference && profile.coverLetterReference);
+
+  if (parts.coverLetter) {
+    if (profile.coverLetterStyle?.preset) {
+      system += ` Write the cover letter in a ${profile.coverLetterStyle.preset} tone.`;
+      if (profile.coverLetterStyle.customNotes) {
+        system += ` ${profile.coverLetterStyle.customNotes}`;
+      }
+    }
+    if (includeReference) {
+      system +=
+        " Study the writing style, sentence rhythm, and word choice of the reference " +
+        "cover letter provided (referenceCoverLetter) and emulate that voice — do not " +
+        "copy its content verbatim.";
+    }
+    if (profile.snippets?.length) candidateProfile.snippets = profile.snippets;
+    if (coverLetterOptions?.oneOffNote?.trim()) {
+      candidateProfile.jobSpecificNote = coverLetterOptions.oneOffNote.trim();
+    }
+    if (candidateProfile.snippets || candidateProfile.jobSpecificNote) {
+      system +=
+        " Naturally incorporate relevant details from the candidate's snippets/" +
+        "jobSpecificNote where appropriate, without forcing all of them in.";
+    }
+    if (includeReference) {
+      candidateProfile.referenceCoverLetter = profile.coverLetterReference;
+    }
+  }
+
   const user = JSON.stringify({
     job: {
       title: jobData.title,
@@ -84,7 +122,7 @@ export function buildTailorRequest(
       location: jobData.location ?? null,
       description: jobData.description,
     },
-    candidateProfile: profile,
+    candidateProfile,
   });
 
   return { system, messages: [{ role: "user", content: user }], schema: buildTailoredOutputSchema(parts) };

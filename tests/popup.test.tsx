@@ -268,6 +268,108 @@ describe("Popup", () => {
     expect(screen.queryByRole("button", { name: /Download Résumé/i })).toBeNull();
   });
 
+  it("does not show the reference-voice checkbox when no reference letter is saved", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+
+    render(<Popup />);
+    fireEvent.click(await screen.findByRole("radio", { name: /cover letter/i }));
+    expect(screen.queryByLabelText(/match my reference letter/i)).toBeNull();
+  });
+
+  it("sends coverLetterOptions with includeReference and a one-off note when generating a cover letter", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+      coverLetterReference: "Dear Sir or Madam,",
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: { coverLetter: "Dear hiring team," },
+    });
+
+    render(<Popup />);
+    fireEvent.click(await screen.findByRole("radio", { name: /cover letter/i }));
+
+    const referenceCheckbox = await screen.findByLabelText(/match my reference letter/i);
+    fireEvent.click(referenceCheckbox);
+
+    const noteField = screen.getByPlaceholderText(/anything specific to mention/i);
+    fireEvent.change(noteField, { target: { value: "I've used their product for years." } });
+
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    expect(await screen.findByText("Dear hiring team,")).toBeInTheDocument();
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "GENERATE_TAILORED",
+        coverLetterOptions: { includeReference: true, oneOffNote: "I've used their product for years." },
+      })
+    );
+  });
+
+  it("omits coverLetterOptions for a résumé-only generation", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+      coverLetterReference: "Dear Sir or Madam,",
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: { resume: { summary: "S", experience: [], skills: [] } },
+    });
+
+    render(<Popup />);
+    fireEvent.click(await screen.findByRole("radio", { name: /résumé/i }));
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    await screen.findByText("Preview");
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "GENERATE_TAILORED", coverLetterOptions: undefined })
+    );
+  });
+
   it("shows a settings gear that opens the options page in every state", async () => {
     vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
     vi.mocked(storage.getMasterProfile).mockResolvedValue({

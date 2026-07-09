@@ -8,6 +8,7 @@ export interface GenerateTailoredMessage {
   profile: MasterProfile;
   apiKey: string;
   parts: GenerationParts;
+  coverLetterOptions?: { includeReference: boolean; oneOffNote?: string };
 }
 
 export interface ImportProfileMessage {
@@ -31,7 +32,12 @@ export async function handleMessage(
 ): Promise<{ ok: true; data: TailoredOutput | MasterProfile } | { ok: false; error: string }> {
   try {
     if (message.type === "GENERATE_TAILORED") {
-      const { system, messages, schema } = buildTailorRequest(message.jobData, message.profile, message.parts);
+      const { system, messages, schema } = buildTailorRequest(
+        message.jobData,
+        message.profile,
+        message.parts,
+        message.coverLetterOptions
+      );
       const raw = await callClaudeApi(message.apiKey, system, messages, schema);
       return { ok: true, data: parseTailorResponse(raw, message.parts) };
     }

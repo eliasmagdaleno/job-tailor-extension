@@ -38,6 +38,24 @@ describe("handleMessage", () => {
     );
   });
 
+  it("threads coverLetterOptions through to the prompt on GENERATE_TAILORED", async () => {
+    const callClaudeApi = vi.fn(async () => JSON.stringify({ coverLetter: "C" }));
+    await handleMessage(
+      {
+        type: "GENERATE_TAILORED",
+        jobData,
+        profile,
+        apiKey: "sk-ant-test",
+        parts: { resume: false, coverLetter: true },
+        coverLetterOptions: { includeReference: false, oneOffNote: "Mention I'm a long-time user." },
+      },
+      callClaudeApi
+    );
+    const messages = (callClaudeApi.mock.calls[0] as any)[2];
+    const content = JSON.parse(messages[0].content);
+    expect(content.candidateProfile.jobSpecificNote).toBe("Mention I'm a long-time user.");
+  });
+
   it("imports a profile on IMPORT_PROFILE", async () => {
     const callClaudeApi = vi.fn(async () => JSON.stringify(profile));
     const result = await handleMessage(
