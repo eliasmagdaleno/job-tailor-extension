@@ -12,6 +12,10 @@ type PopupState =
       apiKey: string;
       profile: MasterProfile;
       jobData: JobData | null;
+      // Why no job was read, when jobData is null. "unsupported-page": no
+      // content script responded (not a supported site, or still loading).
+      // "no-job": the content script ran but found no listing on the page.
+      unavailable: "unsupported-page" | "no-job" | null;
       alreadyLoggedOn: string | null; // dateApplied of the existing record, if any
     }
   | {
@@ -42,6 +46,7 @@ function isProfileIncomplete(profile: MasterProfile): boolean {
 export default function Popup() {
   const [state, setState] = useState<PopupState>({ step: "loading" });
   const [logging, setLogging] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     void bootstrap();
@@ -58,21 +63,38 @@ export default function Popup() {
       setState({ step: "setup-required", missing: "profile" });
       return;
     }
-    const jobData = await parseCurrentTab();
+    const parsed = await parseCurrentTab();
+    const jobData = parsed.kind === "found" ? parsed.jobData : null;
     const alreadyLoggedOn = jobData
       ? ((await findApplicationByUrl(jobData.url))?.dateApplied ?? null)
       : null;
-    setState({ step: "ready", apiKey, profile, jobData, alreadyLoggedOn });
+    setState({
+      step: "ready",
+      apiKey,
+      profile,
+      jobData,
+      unavailable: parsed.kind === "found" ? null : parsed.kind,
+      alreadyLoggedOn,
+    });
   }
 
-  async function parseCurrentTab(): Promise<JobData | null> {
+  async function parseCurrentTab(): Promise<
+    | { kind: "found"; jobData: JobData }
+    | { kind: "unsupported-page" }
+    | { kind: "no-job" }
+  > {
     const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id) return null;
+    if (!tab?.id) return { kind: "unsupported-page" };
     try {
       const result = await browser.tabs.sendMessage(tab.id, { type: "PARSE_JOB_REQUEST" });
-      return (result as JobData | null) ?? null;
+      if (result) return { kind: "found", jobData: result as JobData };
+      // The content script ran but neither strategy found a listing.
+      return { kind: "no-job" };
     } catch {
-      return null;
+      // sendMessage rejects ("receiving end does not exist") when no content
+      // script is listening on this tab — i.e. it's not a supported page, or
+      // the page hasn't finished loading the script yet.
+      return { kind: "unsupported-page" };
     }
   }
 
@@ -136,14 +158,27 @@ export default function Popup() {
 
   async function handleDownloadResume() {
     if (state.step !== "generated") return;
-    const html = renderResumeHtml(state.output, state.profile.contact);
-    await downloadPdf(html, `${state.profile.contact.name} - Resume - ${state.jobData.company}.pdf`);
+    setDownloadError(null);
+    try {
+      const html = renderResumeHtml(state.output, state.profile.contact);
+      await downloadPdf(html, `${state.profile.contact.name} - Resume - ${state.jobData.company}.pdf`);
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function handleDownloadCoverLetter() {
     if (state.step !== "generated") return;
-    const html = renderCoverLetterHtml(state.output, state.profile.contact);
-    await downloadPdf(html, `${state.profile.contact.name} - Cover Letter - ${state.jobData.company}.pdf`);
+    setDownloadError(null);
+    try {
+      const html = renderCoverLetterHtml(state.output, state.profile.contact);
+      await downloadPdf(
+        html,
+        `${state.profile.contact.name} - Cover Letter - ${state.jobData.company}.pdf`
+      );
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   if (state.step === "loading") return <p>Loading…</p>;
@@ -163,7 +198,13 @@ export default function Popup() {
 
   if (state.step === "ready") {
     if (!state.jobData) {
-      return <p>Couldn't read this page automatically. Open a Welcome to the Jungle job listing and try again.</p>;
+      return (
+        <p>
+          {state.unavailable === "unsupported-page"
+            ? "This doesn't look like a Welcome to the Jungle job page yet. Open a job listing on welcometothejungle.com — and let it finish loading — then reopen this popup."
+            : "Couldn't find a job listing on this page. Make sure you've opened a specific job posting (not a search or company page) and that it has finished loading."}
+        </p>
+      );
     }
     const jobData = state.jobData;
     return (
@@ -195,6 +236,7 @@ export default function Popup() {
       <p>{state.output.coverLetter}</p>
       <button onClick={handleDownloadResume}>Download Resume PDF</button>
       <button onClick={handleDownloadCoverLetter}>Download Cover Letter PDF</button>
+      {downloadError && <p role="alert">PDF export failed: {downloadError}</p>}
       {state.alreadyLoggedOn && <p>Already logged on {state.alreadyLoggedOn}.</p>}
       <button onClick={handleMarkAsApplied} disabled={logging}>
         {state.alreadyLoggedOn ? "Log Anyway" : "Mark as Applied"}

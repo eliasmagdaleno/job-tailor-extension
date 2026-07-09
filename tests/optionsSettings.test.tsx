@@ -104,4 +104,25 @@ describe("ProfileEditor", () => {
     expect(storage.setMasterProfile).not.toHaveBeenCalled();
     expect(await screen.findByPlaceholderText("Full name")).toHaveValue("Imported Name");
   });
+
+  it("surfaces the real error when the import fails", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({
+      ok: false,
+      error: "Claude API error (400): credit balance too low",
+    });
+
+    render(<ProfileEditor />);
+    await waitFor(() => expect(storage.getApiKey).toHaveResolved());
+    const fileInput = (await screen.findByLabelText(/Import from resume file/)) as HTMLInputElement;
+    const file = new File(["resume text"], "resume.txt", { type: "text/plain" });
+    file.text = vi.fn().mockResolvedValue("resume text");
+
+    await userEvent.upload(fileInput, file);
+
+    expect(
+      await screen.findByText(/Claude API error \(400\): credit balance too low/)
+    ).toBeInTheDocument();
+    expect(storage.setMasterProfile).not.toHaveBeenCalled();
+  });
 });

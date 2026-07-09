@@ -14,6 +14,45 @@ export function parseJobFromPage(doc: Document, url: string): JobData | null {
   return null;
 }
 
+/**
+ * Some Welcome to the Jungle surfaces — notably the Otta app at
+ * app.welcometothejungle.com — server-render a `JobPosting` JSON-LD block but
+ * strip it from the live DOM once React/react-helmet hydrates, so reading the
+ * live document finds nothing. When the in-page parse comes up empty, re-fetch
+ * the page URL: the server response still contains the JSON-LD, and it's the
+ * same schema `parseJobFromPage` already handles.
+ *
+ * The re-fetch MUST omit credentials. The Otta app only server-renders the
+ * full page (with JSON-LD) for anonymous/crawler requests; a logged-in request
+ * gets a bare SPA shell with no structured data. Sending cookies would defeat
+ * the whole fallback. The anonymous response is the same public job listing.
+ *
+ * `fetchHtml`/`parseHtml` are injectable for testing.
+ */
+export async function parseJobFromPageOrFetch(
+  doc: Document,
+  url: string,
+  deps: {
+    fetchHtml?: (url: string) => Promise<string>;
+    parseHtml?: (html: string) => Document;
+  } = {}
+): Promise<JobData | null> {
+  const direct = parseJobFromPage(doc, url);
+  if (direct) return direct;
+
+  const fetchHtml =
+    deps.fetchHtml ?? ((u) => fetch(u, { credentials: "omit" }).then((r) => r.text()));
+  const parseHtml =
+    deps.parseHtml ?? ((html) => new DOMParser().parseFromString(html, "text/html"));
+
+  try {
+    const html = await fetchHtml(url);
+    return parseJobFromPage(parseHtml(html), url);
+  } catch {
+    return null;
+  }
+}
+
 function parseFromJsonLd(doc: Document): PartialJobData | null {
   const scripts = Array.from(doc.querySelectorAll('script[type="application/ld+json"]'));
   for (const script of scripts) {
@@ -26,9 +65,11 @@ function parseFromJsonLd(doc: Document): PartialJobData | null {
     const posting = findJobPosting(data);
     if (!posting) continue;
 
-    const title = typeof posting.title === "string" ? posting.title : null;
+    const title = typeof posting.title === "string" ? posting.title.trim() : null;
     const company =
-      typeof posting.hiringOrganization?.name === "string" ? posting.hiringOrganization.name : null;
+      typeof posting.hiringOrganization?.name === "string"
+        ? posting.hiringOrganization.name.trim()
+        : null;
     const description =
       typeof posting.description === "string" ? stripHtml(doc, posting.description) : null;
 

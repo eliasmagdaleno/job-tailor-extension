@@ -15,6 +15,9 @@ export default function ProfileEditor() {
   const [profile, setProfile] = useState<MasterProfile>(EMPTY_PROFILE);
   const [apiKey, setApiKeyState] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saved" | "importing" | "import-failed" | "imported">("idle");
+  // The specific reason an import failed (e.g. an Anthropic API error), so the
+  // user sees the real cause rather than a generic guess.
+  const [importError, setImportError] = useState<string>("");
 
   // Raw, unnormalized text the user is currently typing. Kept separate from
   // `profile` so that delimiter keystrokes (Enter for bullets, comma for
@@ -60,25 +63,33 @@ export default function ProfileEditor() {
   }
 
   async function handleImport(file: File) {
+    setImportError("");
     if (!apiKey) {
+      setImportError("No API key set. Add your Anthropic API key above and save it first.");
       setStatus("import-failed");
       return;
     }
     setStatus("importing");
-    const resumeText = await file.text();
-    const response = (await browser.runtime.sendMessage({
-      type: "IMPORT_PROFILE",
-      resumeText,
-      apiKey,
-    })) as { ok: true; data: MasterProfile } | { ok: false; error: string };
+    try {
+      const resumeText = await file.text();
+      const response = (await browser.runtime.sendMessage({
+        type: "IMPORT_PROFILE",
+        resumeText,
+        apiKey,
+      })) as { ok: true; data: MasterProfile } | { ok: false; error: string };
 
-    if (response.ok) {
-      // Imported data is reviewable/editable before it's persisted — do not
-      // auto-save, and do not claim "Saved." when nothing was written.
-      setProfile(response.data);
-      resetDrafts(response.data);
-      setStatus("imported");
-    } else {
+      if (response.ok) {
+        // Imported data is reviewable/editable before it's persisted — do not
+        // auto-save, and do not claim "Saved." when nothing was written.
+        setProfile(response.data);
+        resetDrafts(response.data);
+        setStatus("imported");
+      } else {
+        setImportError(response.error);
+        setStatus("import-failed");
+      }
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : String(err));
       setStatus("import-failed");
     }
   }
@@ -137,7 +148,11 @@ export default function ProfileEditor() {
         />
       </label>
       {status === "importing" && <p>Importing…</p>}
-      {status === "import-failed" && <p>Import failed. Set your API key first, or fill the form manually.</p>}
+      {status === "import-failed" && (
+        <p style={{ color: "crimson", whiteSpace: "pre-wrap" }}>
+          Import failed: {importError || "Unknown error."} You can also fill the form manually below.
+        </p>
+      )}
       {status === "imported" && <p>Imported — review below, then click Save Profile.</p>}
 
       <fieldset>
