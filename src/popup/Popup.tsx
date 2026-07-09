@@ -3,7 +3,7 @@ import browser from "webextension-polyfill";
 import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication, getGenerationStatus } from "../lib/storage";
 import { renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
 import { downloadResumePdf } from "../lib/resumePdf";
-import type { GenerationParts, JobData, MasterProfile, TailoredOutput } from "../lib/types";
+import type { GenerationParts, GenerationStatus, JobData, MasterProfile, TailoredOutput } from "../lib/types";
 
 type Choice = "resume" | "coverLetter" | "both";
 const CHOICE_TO_PARTS: Record<Choice, GenerationParts> = {
@@ -101,15 +101,7 @@ export default function Popup() {
 
     function onStorageChanged(changes: Record<string, { newValue?: unknown }>, areaName: string) {
       if (areaName !== "local") return;
-      const next = changes.generationStatus?.newValue as
-        | {
-            phase: "running" | "done" | "error" | "cancelled";
-            jobData: JobData;
-            parts: GenerationParts;
-            output?: TailoredOutput;
-            message?: string;
-          }
-        | undefined;
+      const next = changes.generationStatus?.newValue as GenerationStatus | undefined;
       if (!next || next.phase === "running") return;
       const { apiKey, profile, jobData, alreadyLoggedOn } = generatingState;
       if (next.phase === "done") {
