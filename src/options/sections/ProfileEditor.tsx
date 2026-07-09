@@ -392,16 +392,22 @@ export default function ProfileEditor() {
             onChange={(e) => setProfile({ ...profile, coverLetterReference: e.target.value })}
           />
           <label className="wb__import">
-            <span className="wb__import-hint">Or upload a file (.txt or .md)</span>
+            <span className="wb__import-hint">Or upload a file (.txt, .md, .pdf, or .docx)</span>
             <input
               className="wb__file"
               type="file"
-              accept=".txt,.md"
+              accept=".txt,.md,.pdf,.docx"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const text = await file.text();
-                setProfile({ ...profile, coverLetterReference: text });
+                setImportError("");
+                try {
+                  const text = await extractText(file);
+                  setProfile({ ...profile, coverLetterReference: text });
+                } catch (err) {
+                  setImportError(err instanceof Error ? err.message : String(err));
+                  setStatus("import-failed");
+                }
               }}
             />
           </label>

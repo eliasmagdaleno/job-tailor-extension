@@ -209,4 +209,47 @@ describe("ProfileEditor", () => {
     ).toBeInTheDocument();
     expect(storage.setMasterProfile).not.toHaveBeenCalled();
   });
+
+  it("imports a .docx reference cover letter by routing it through extractText", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(fileTextExtractor.extractText).mockResolvedValue("## Dear Hiring Manager\n\nI'm excited to apply.");
+
+    render(<ProfileEditor />);
+    await waitFor(() => expect(storage.getApiKey).toHaveResolved());
+    const fileInput = (await screen.findByLabelText(/Or upload a file/)) as HTMLInputElement;
+    const file = new File([], "cover-letter.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+
+    await userEvent.upload(fileInput, file);
+
+    // The default findByDisplayValue normalizer collapses whitespace in the
+    // node's value before comparing, but does not normalize the search
+    // string — so a value containing "\n\n" can never match a literal
+    // "\n\n" search string via the default matcher. Disable normalization
+    // so this asserts the exact extracted text, not a collapsed one.
+    expect(
+      await screen.findByDisplayValue("## Dear Hiring Manager\n\nI'm excited to apply.", {
+        normalizer: (text) => text,
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces an error when the reference cover letter file can't be converted", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(fileTextExtractor.extractText).mockRejectedValue(
+      new fileTextExtractor.ExtractionError("This PDF is password-protected. Remove the password or export as .txt/.md.")
+    );
+
+    render(<ProfileEditor />);
+    await waitFor(() => expect(storage.getApiKey).toHaveResolved());
+    const fileInput = (await screen.findByLabelText(/Or upload a file/)) as HTMLInputElement;
+    const file = new File([], "cover-letter.pdf", { type: "application/pdf" });
+
+    await userEvent.upload(fileInput, file);
+
+    expect(
+      await screen.findByText(/This PDF is password-protected\. Remove the password or export as \.txt\/\.md\./)
+    ).toBeInTheDocument();
+  });
 });
