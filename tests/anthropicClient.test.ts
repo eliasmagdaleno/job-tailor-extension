@@ -3,6 +3,7 @@ import {
   buildTailorRequest,
   parseTailorResponse,
   callClaudeApi,
+  buildTailoredOutputSchema,
 } from "../src/lib/anthropicClient";
 import type { JobData, MasterProfile } from "../src/lib/types";
 
@@ -60,6 +61,66 @@ describe("parseTailorResponse", () => {
 
   it("throws when required fields are missing", () => {
     expect(() => parseTailorResponse(JSON.stringify({ resume: {} }))).toThrow(/required resume fields/);
+  });
+});
+
+describe("buildTailoredOutputSchema", () => {
+  it("includes only the resume when cover letter is not requested", () => {
+    const schema = buildTailoredOutputSchema({ resume: true, coverLetter: false }) as any;
+    expect(schema.required).toEqual(["resume"]);
+    expect(schema.properties.coverLetter).toBeUndefined();
+    expect(schema.properties.resume).toBeDefined();
+  });
+
+  it("includes only the cover letter when resume is not requested", () => {
+    const schema = buildTailoredOutputSchema({ resume: false, coverLetter: true }) as any;
+    expect(schema.required).toEqual(["coverLetter"]);
+    expect(schema.properties.resume).toBeUndefined();
+  });
+});
+
+describe("buildTailorRequest parts", () => {
+  it("returns a schema and omits résumé wording when only a cover letter is requested", () => {
+    const { system, schema } = buildTailorRequest(jobData, profile, { resume: false, coverLetter: true });
+    expect((schema as any).required).toEqual(["coverLetter"]);
+    expect(system).toContain("coverLetter");
+    expect(system).not.toContain('"resume"');
+  });
+});
+
+describe("parseTailorResponse parts", () => {
+  it("parses a cover-letter-only response without requiring résumé fields", () => {
+    const raw = JSON.stringify({ coverLetter: "Dear team," });
+    const result = parseTailorResponse(raw, { resume: false, coverLetter: true });
+    expect(result.coverLetter).toBe("Dear team,");
+    expect(result.resume).toBeUndefined();
+  });
+
+  it("throws when a requested cover letter is missing", () => {
+    expect(() =>
+      parseTailorResponse(JSON.stringify({ resume: { summary: "s", experience: [], skills: [] } }), {
+        resume: false,
+        coverLetter: true,
+      })
+    ).toThrow(/cover letter/i);
+  });
+});
+
+describe("callClaudeApi schema param", () => {
+  it("omits output_config when no schema is passed", async () => {
+    const spy = vi.fn(async () => ({ ok: true, json: async () => ({ content: [{ type: "text", text: "x" }] }) }));
+    vi.stubGlobal("fetch", spy);
+    await callClaudeApi("sk-ant-test", "sys", [{ role: "user", content: "hi" }]);
+    const body = JSON.parse((spy.mock.calls[0] as any)[1].body);
+    expect(body.output_config).toBeUndefined();
+  });
+
+  it("includes output_config when a schema is passed", async () => {
+    const spy = vi.fn(async () => ({ ok: true, json: async () => ({ content: [{ type: "text", text: "x" }] }) }));
+    vi.stubGlobal("fetch", spy);
+    await callClaudeApi("sk-ant-test", "sys", [{ role: "user", content: "hi" }], { type: "object" });
+    const body = JSON.parse((spy.mock.calls[0] as any)[1].body);
+    expect(body.output_config.format.type).toBe("json_schema");
   });
 });
 

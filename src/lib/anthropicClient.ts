@@ -1,5 +1,5 @@
 import { safeParseJson } from "./safeParseJson";
-import type { JobData, MasterProfile, TailoredOutput } from "./types";
+import type { GenerationParts, JobData, MasterProfile, TailoredOutput } from "./types";
 
 export interface AnthropicMessage {
   role: "user";
@@ -9,58 +9,73 @@ export interface AnthropicMessage {
 const MODEL = "claude-sonnet-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
 
-// JSON Schema mirroring `TailoredOutput`. Passed to the Messages API as a
-// structured-output format so Claude is constrained to emit valid, parseable
-// JSON of exactly this shape — no prose, no fences, no unescaped control
-// characters. This is the root-cause fix for "Claude response did not match
-// the expected resume/coverLetter shape": those failures were the model
-// wrapping or malforming the JSON, which structured outputs prevents by
-// construction. Every object needs `additionalProperties: false` and a
-// `required` list (structured-outputs requirement).
-const TAILORED_OUTPUT_SCHEMA = {
+// Résumé sub-schema (structured outputs: every object needs
+// additionalProperties:false + required). Structured outputs constrain Claude
+// to emit valid, parseable JSON of exactly this shape — the root-cause fix for
+// "Claude response did not match the expected resume/coverLetter shape".
+const RESUME_SCHEMA = {
   type: "object",
   properties: {
-    resume: {
-      type: "object",
-      properties: {
-        summary: { type: "string" },
-        experience: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              company: { type: "string" },
-              title: { type: "string" },
-              dates: { type: "string" },
-              bullets: { type: "array", items: { type: "string" } },
-            },
-            required: ["company", "title", "dates", "bullets"],
-            additionalProperties: false,
-          },
+    summary: { type: "string" },
+    experience: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          company: { type: "string" },
+          title: { type: "string" },
+          dates: { type: "string" },
+          bullets: { type: "array", items: { type: "string" } },
         },
-        skills: { type: "array", items: { type: "string" } },
+        required: ["company", "title", "dates", "bullets"],
+        additionalProperties: false,
       },
-      required: ["summary", "experience", "skills"],
-      additionalProperties: false,
     },
-    coverLetter: { type: "string" },
+    skills: { type: "array", items: { type: "string" } },
   },
-  required: ["resume", "coverLetter"],
+  required: ["summary", "experience", "skills"],
   additionalProperties: false,
 } as const;
 
+const BOTH: GenerationParts = { resume: true, coverLetter: true };
+
+export function buildTailoredOutputSchema(parts: GenerationParts) {
+  const properties: Record<string, unknown> = {};
+  const required: string[] = [];
+  if (parts.resume) {
+    properties.resume = RESUME_SCHEMA;
+    required.push("resume");
+  }
+  if (parts.coverLetter) {
+    properties.coverLetter = { type: "string" };
+    required.push("coverLetter");
+  }
+  return { type: "object", properties, required, additionalProperties: false };
+}
+
 export function buildTailorRequest(
   jobData: JobData,
-  profile: MasterProfile
-): { system: string; messages: AnthropicMessage[] } {
+  profile: MasterProfile,
+  parts: GenerationParts = BOTH
+): { system: string; messages: AnthropicMessage[]; schema: object } {
+  const wants: string[] = [];
+  if (parts.resume) {
+    wants.push(
+      '"resume": { "summary": string, "experience": Array<{ "company": string, ' +
+        '"title": string, "dates": string, "bullets": string[] }>, "skills": string[] }'
+    );
+  }
+  if (parts.coverLetter) wants.push('"coverLetter": string');
+
   const system =
     "You are an expert resume writer. Given a job listing and a candidate's " +
     "master profile, select and lightly rewrite the most relevant experience " +
-    "bullets and write a tailored cover letter. Respond with ONLY valid JSON " +
-    'matching this TypeScript type, no markdown fences, no commentary:\n' +
-    '{ "resume": { "summary": string, "experience": Array<{ "company": string, ' +
-    '"title": string, "dates": string, "bullets": string[] }>, "skills": string[] }, ' +
-    '"coverLetter": string }';
+    "bullets" +
+    (parts.coverLetter ? " and write a tailored cover letter" : "") +
+    ". Respond with ONLY valid JSON matching this TypeScript type, no markdown " +
+    "fences, no commentary:\n{ " +
+    wants.join(", ") +
+    " }";
 
   const user = JSON.stringify({
     job: {
@@ -72,10 +87,10 @@ export function buildTailorRequest(
     candidateProfile: profile,
   });
 
-  return { system, messages: [{ role: "user", content: user }] };
+  return { system, messages: [{ role: "user", content: user }], schema: buildTailoredOutputSchema(parts) };
 }
 
-export function parseTailorResponse(raw: string): TailoredOutput {
+export function parseTailorResponse(raw: string, parts: GenerationParts = BOTH): TailoredOutput {
   const parsed = safeParseJson(raw);
   if (!parsed || typeof parsed !== "object") {
     // Include a bounded preview of what actually came back so a parse failure
@@ -89,24 +104,45 @@ export function parseTailorResponse(raw: string): TailoredOutput {
   }
 
   const { resume, coverLetter } = parsed as any;
+  const out: TailoredOutput = {};
 
-  if (
-    typeof resume?.summary !== "string" ||
-    !Array.isArray(resume?.experience) ||
-    !Array.isArray(resume?.skills) ||
-    typeof coverLetter !== "string"
-  ) {
-    throw new Error("Claude response was missing required resume fields");
+  if (parts.resume) {
+    if (
+      typeof resume?.summary !== "string" ||
+      !Array.isArray(resume?.experience) ||
+      !Array.isArray(resume?.skills)
+    ) {
+      throw new Error("Claude response was missing required resume fields");
+    }
+    out.resume = resume;
   }
 
-  return { resume, coverLetter };
+  if (parts.coverLetter) {
+    if (typeof coverLetter !== "string") {
+      throw new Error("Claude response was missing the cover letter");
+    }
+    out.coverLetter = coverLetter;
+  }
+
+  return out;
 }
 
 export async function callClaudeApi(
   apiKey: string,
   system: string,
-  messages: AnthropicMessage[]
+  messages: AnthropicMessage[],
+  schema?: object
 ): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: MODEL,
+    max_tokens: 16000,
+    system,
+    messages,
+  };
+  if (schema) {
+    body.output_config = { format: { type: "json_schema", schema } };
+  }
+
   const response = await fetch(API_URL, {
     method: "POST",
     headers: {
@@ -115,15 +151,7 @@ export async function callClaudeApi(
       "anthropic-version": "2023-06-01",
       "anthropic-dangerous-direct-browser-access": "true",
     },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 16000,
-      system,
-      messages,
-      output_config: {
-        format: { type: "json_schema", schema: TAILORED_OUTPUT_SCHEMA },
-      },
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
