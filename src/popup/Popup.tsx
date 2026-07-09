@@ -2,7 +2,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import browser from "webextension-polyfill";
 import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication } from "../lib/storage";
 import { renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
-import type { JobData, MasterProfile, TailoredOutput } from "../lib/types";
+import { downloadResumePdf } from "../lib/resumePdf";
+import type { GenerationParts, JobData, MasterProfile, TailoredOutput } from "../lib/types";
+
+type Choice = "resume" | "coverLetter" | "both";
+const CHOICE_TO_PARTS: Record<Choice, GenerationParts> = {
+  resume: { resume: true, coverLetter: false },
+  coverLetter: { resume: false, coverLetter: true },
+  both: { resume: true, coverLetter: true },
+};
 
 type PopupState =
   | { step: "loading" }
@@ -70,6 +78,7 @@ export default function Popup() {
   const [state, setState] = useState<PopupState>({ step: "loading" });
   const [logging, setLogging] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [choice, setChoice] = useState<Choice>("both");
 
   useEffect(() => {
     void bootstrap();
@@ -121,7 +130,7 @@ export default function Popup() {
     }
   }
 
-  async function handleGenerate(jobData: JobData) {
+  async function handleGenerate(jobData: JobData, parts: GenerationParts) {
     if (state.step !== "ready") return;
     const { apiKey, profile, alreadyLoggedOn } = state;
     setState({ step: "generating", apiKey, profile, jobData, alreadyLoggedOn });
@@ -133,12 +142,13 @@ export default function Popup() {
         jobData,
         profile,
         apiKey,
+        parts,
       })) as { ok: true; data: TailoredOutput } | { ok: false; error: string };
     } catch (err) {
       setState({
         step: "error",
         message: err instanceof Error ? err.message : String(err),
-        retry: () => void handleGenerate(jobData),
+        retry: () => void handleGenerate(jobData, parts),
       });
       return;
     }
@@ -154,7 +164,7 @@ export default function Popup() {
         alreadyLoggedOn: existing?.dateApplied ?? null,
       });
     } else {
-      setState({ step: "error", message: response.error, retry: () => void handleGenerate(jobData) });
+      setState({ step: "error", message: response.error, retry: () => void handleGenerate(jobData, parts) });
     }
   }
 
@@ -182,7 +192,16 @@ export default function Popup() {
   async function handleDownloadResume() {
     if (state.step !== "generated") return;
     if (!state.output.resume) return;
-    // Rewired to jsPDF in Task 5.
+    setDownloadError(null);
+    try {
+      downloadResumePdf(
+        state.output.resume,
+        state.profile,
+        `${state.profile.contact.name} - Resume - ${state.jobData.company}.pdf`
+      );
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function handleDownloadCoverLetter() {
@@ -257,10 +276,23 @@ export default function Popup() {
         {state.alreadyLoggedOn && (
           <p className="jt__stamp">Already logged on {state.alreadyLoggedOn}.</p>
         )}
+        <fieldset className="jt__choice" role="radiogroup" aria-label="What to generate">
+          {(["resume", "coverLetter", "both"] as const).map((value) => (
+            <label key={value} className="jt__choice-opt">
+              <input
+                type="radio"
+                name="jt-choice"
+                checked={choice === value}
+                onChange={() => setChoice(value)}
+              />
+              <span>{value === "resume" ? "Résumé" : value === "coverLetter" ? "Cover letter" : "Both"}</span>
+            </label>
+          ))}
+        </fieldset>
         <div className="jt__actions">
           <button
             className="jt__btn jt__btn--primary"
-            onClick={() => handleGenerate(jobData)}
+            onClick={() => handleGenerate(jobData, CHOICE_TO_PARTS[choice])}
           >
             Generate
           </button>

@@ -231,4 +231,40 @@ describe("Popup", () => {
 
     expect(storage.addApplication).toHaveBeenCalledTimes(1);
   });
+
+  it("generates only a cover letter when 'Cover letter' is selected", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue({
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle",
+      parsedVia: "structured",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: { coverLetter: "Dear hiring team," },
+    });
+
+    render(<Popup />);
+    fireEvent.click(await screen.findByRole("radio", { name: /cover letter/i }));
+    fireEvent.click(screen.getByRole("button", { name: /generate/i }));
+
+    expect(await screen.findByText("Dear hiring team,")).toBeInTheDocument();
+    // the message carried a cover-letter-only parts flag
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "GENERATE_TAILORED", parts: { resume: false, coverLetter: true } })
+    );
+    // no résumé download button when no résumé was produced
+    expect(screen.queryByRole("button", { name: /Download Résumé/i })).toBeNull();
+  });
 });
