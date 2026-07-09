@@ -8,3 +8,7 @@ dist
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# Internal working notes (design specs, plans, handoffs) — not part of the
+# public repo
+docs/superpowers/
