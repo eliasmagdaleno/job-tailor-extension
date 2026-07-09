@@ -1,5 +1,21 @@
-import { describe, it, expect } from "vitest";
-import { linesToMarkdown, type ExtractedLine } from "../src/lib/fileTextExtractor";
+import { describe, it, expect, vi } from "vitest";
+import * as mammoth from "mammoth";
+import { linesToMarkdown, extractDocxMarkdown, ExtractionError, type ExtractedLine } from "../src/lib/fileTextExtractor";
+
+vi.mock("mammoth", () => ({
+  convertToHtml: vi.fn(),
+}));
+
+vi.mock("turndown", () => ({
+  default: vi.fn().mockImplementation(() => ({
+    turndown: vi.fn((html: string) =>
+      html
+        .replace(/<[^>]+>/g, "\n")
+        .replace(/\n+/g, "\n")
+        .trim()
+    ),
+  })),
+}));
 
 describe("linesToMarkdown", () => {
   it("returns an empty string for no lines", () => {
@@ -59,5 +75,32 @@ describe("linesToMarkdown", () => {
     expect(linesToMarkdown(lines)).toBe(
       "## Jane Doe\n\nSoftware Engineer with five years of experience."
     );
+  });
+});
+
+describe("extractDocxMarkdown", () => {
+  it("converts docx HTML (from mammoth) to text via turndown", async () => {
+    vi.mocked(mammoth.convertToHtml).mockResolvedValue({
+      value: "<h1>Jane Doe</h1><p>Software engineer with five years of experience.</p>",
+      messages: [],
+    });
+
+    const result = await extractDocxMarkdown(new ArrayBuffer(8));
+
+    expect(result).toContain("Jane Doe");
+    expect(result).toContain("Software engineer with five years of experience.");
+  });
+
+  it("throws ExtractionError when mammoth cannot parse the file", async () => {
+    vi.mocked(mammoth.convertToHtml).mockRejectedValue(new Error("not a valid zip file"));
+
+    await expect(extractDocxMarkdown(new ArrayBuffer(8))).rejects.toThrow(ExtractionError);
+    await expect(extractDocxMarkdown(new ArrayBuffer(8))).rejects.toThrow(/valid \.docx/);
+  });
+
+  it("throws ExtractionError when the docx has no readable text", async () => {
+    vi.mocked(mammoth.convertToHtml).mockResolvedValue({ value: "<p></p>", messages: [] });
+
+    await expect(extractDocxMarkdown(new ArrayBuffer(8))).rejects.toThrow(/couldn't find readable text/i);
   });
 });
