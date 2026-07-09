@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import browser from "webextension-polyfill";
 import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication } from "../lib/storage";
 import { renderResumeHtml, renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
@@ -34,6 +34,29 @@ type PopupState =
       alreadyLoggedOn: string | null; // dateApplied of the existing record, if any
     }
   | { step: "error"; message: string; retry: () => void };
+
+/**
+ * The cloth: every state renders inside this shell so the tick-ruler spine,
+ * masthead, and stitched seam stay continuous across the flow.
+ */
+function Frame({ children }: { children: ReactNode }) {
+  return (
+    <div className="jt">
+      <div className="jt__ruler" aria-hidden="true" />
+      <div className="jt__body">
+        <header className="jt__masthead">
+          <span className="jt__shears" aria-hidden="true">
+            ✂
+          </span>
+          <span className="jt__wordmark">Job Tailor</span>
+          <span className="jt__tagline">Made to measure</span>
+        </header>
+        <div className="jt__seam" aria-hidden="true" />
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function isProfileIncomplete(profile: MasterProfile): boolean {
   return (
@@ -181,66 +204,141 @@ export default function Popup() {
     }
   }
 
-  if (state.step === "loading") return <p>Loading…</p>;
+  if (state.step === "loading") {
+    return (
+      <Frame>
+        <div className="jt__status">
+          <span>Measuring</span>
+          <span className="jt__stitch" aria-hidden="true" />
+        </div>
+      </Frame>
+    );
+  }
 
   if (state.step === "setup-required") {
     return (
-      <div>
-        <p>
+      <Frame>
+        <span className="jt__label">Fitting room</span>
+        <p className="jt__lede">
           {state.missing === "apiKey"
             ? "Add your Anthropic API key to get started."
             : "Fill in your profile to get started."}
         </p>
-        <button onClick={() => browser.runtime.openOptionsPage()}>Open Settings</button>
-      </div>
+        <div className="jt__actions">
+          <button
+            className="jt__btn jt__btn--primary"
+            onClick={() => browser.runtime.openOptionsPage()}
+          >
+            Open Settings
+          </button>
+        </div>
+      </Frame>
     );
   }
 
   if (state.step === "ready") {
     if (!state.jobData) {
       return (
-        <p>
-          {state.unavailable === "unsupported-page"
-            ? "This doesn't look like a Welcome to the Jungle job page yet. Open a job listing on welcometothejungle.com — and let it finish loading — then reopen this popup."
-            : "Couldn't find a job listing on this page. Make sure you've opened a specific job posting (not a search or company page) and that it has finished loading."}
-        </p>
+        <Frame>
+          <span className="jt__label">No cloth on the table</span>
+          <p className="jt__lede">
+            {state.unavailable === "unsupported-page"
+              ? "This doesn't look like a Welcome to the Jungle job page yet. Open a job listing on welcometothejungle.com — and let it finish loading — then reopen this popup."
+              : "Couldn't find a job listing on this page. Make sure you've opened a specific job posting (not a search or company page) and that it has finished loading."}
+          </p>
+        </Frame>
       );
     }
     const jobData = state.jobData;
     return (
-      <div>
-        <p>
-          Found: {jobData.title} @ {jobData.company}
-        </p>
-        {state.alreadyLoggedOn && <p>Already logged on {state.alreadyLoggedOn}.</p>}
-        <button onClick={() => handleGenerate(jobData)}>Generate</button>
-      </div>
+      <Frame>
+        <div className="jt__tag">
+          <span className="jt__tag-eyebrow">On the table</span>
+          <div className="jt__tag-title">
+            {jobData.title} @ {jobData.company}
+          </div>
+        </div>
+        {state.alreadyLoggedOn && (
+          <p className="jt__stamp">Already logged on {state.alreadyLoggedOn}.</p>
+        )}
+        <div className="jt__actions">
+          <button
+            className="jt__btn jt__btn--primary"
+            onClick={() => handleGenerate(jobData)}
+          >
+            Generate
+          </button>
+        </div>
+      </Frame>
     );
   }
 
-  if (state.step === "generating") return <p>Generating…</p>;
+  if (state.step === "generating") {
+    return (
+      <Frame>
+        <div className="jt__status">
+          <span>Tailoring</span>
+          <span className="jt__stitch" aria-hidden="true" />
+        </div>
+        <p className="jt__note">
+          Cutting the résumé and cover letter to fit this listing.
+        </p>
+      </Frame>
+    );
+  }
 
   if (state.step === "error") {
     return (
-      <div>
-        <p>{state.message}</p>
-        <button onClick={state.retry}>Retry</button>
-      </div>
+      <Frame>
+        <div className="jt__alert" role="alert">
+          <span className="jt__label jt__alert-label">Snag</span>
+          <p className="jt__alert-msg">{state.message}</p>
+        </div>
+        <div className="jt__actions">
+          <button className="jt__btn jt__btn--ghost" onClick={state.retry}>
+            Retry
+          </button>
+        </div>
+      </Frame>
     );
   }
 
   return (
-    <div>
-      <h2>Preview</h2>
-      <p>{state.output.resume.summary}</p>
-      <p>{state.output.coverLetter}</p>
-      <button onClick={handleDownloadResume}>Download Resume PDF</button>
-      <button onClick={handleDownloadCoverLetter}>Download Cover Letter PDF</button>
-      {downloadError && <p role="alert">PDF export failed: {downloadError}</p>}
-      {state.alreadyLoggedOn && <p>Already logged on {state.alreadyLoggedOn}.</p>}
-      <button onClick={handleMarkAsApplied} disabled={logging}>
-        {state.alreadyLoggedOn ? "Log Anyway" : "Mark as Applied"}
-      </button>
-    </div>
+    <Frame>
+      <h2 className="jt__preview-title">Preview</h2>
+      <div className="jt__section">
+        <span className="jt__label">Summary</span>
+        <p className="jt__excerpt">{state.output.resume.summary}</p>
+      </div>
+      <div className="jt__section">
+        <span className="jt__label">Cover letter</span>
+        <p className="jt__excerpt jt__excerpt--letter">{state.output.coverLetter}</p>
+      </div>
+      <div className="jt__actions">
+        <button className="jt__btn jt__btn--primary" onClick={handleDownloadResume}>
+          Download Résumé PDF
+        </button>
+        <button className="jt__btn jt__btn--ghost" onClick={handleDownloadCoverLetter}>
+          Download Cover Letter PDF
+        </button>
+      </div>
+      {downloadError && (
+        <p className="jt__inline-error" role="alert">
+          PDF export failed: {downloadError}
+        </p>
+      )}
+      {state.alreadyLoggedOn && (
+        <p className="jt__stamp">Already logged on {state.alreadyLoggedOn}.</p>
+      )}
+      <div className="jt__actions">
+        <button
+          className="jt__btn jt__btn--ghost"
+          onClick={handleMarkAsApplied}
+          disabled={logging}
+        >
+          {state.alreadyLoggedOn ? "Log Anyway" : "Mark as Applied"}
+        </button>
+      </div>
+    </Frame>
   );
 }

@@ -1,0 +1,413 @@
+/* Job Tailor — popup
+ *
+ * Direction: chalk marks on dark cloth. The popup is a made-to-measure order
+ * ticket. The surface is ink twill (the cloth being cut), text is tailor's
+ * chalk, the accent is brass (shears, thimble, the metal end of a tape).
+ *
+ * Signature: a left-edge tick-ruler spine that runs through every state,
+ * running-stitch dividers, and a hang-tag card for the parsed listing.
+ * Labels are set in uppercase mono — the spec hand of a tailoring ticket.
+ */
+
+:root {
+  --cloth: #191c27;
+  --cloth-raise: #20242f;
+  --chalk: #e9ecf3;
+  --chalk-dim: #9aa0b2;
+  --brass: #c9a24b;
+  --brass-bright: #e4c173;
+  --thread: #ce5646;
+  --ink: #191c27;
+
+  --seam: rgba(233, 236, 243, 0.12);
+  --seam-strong: rgba(233, 236, 243, 0.22);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo,
+    Consolas, monospace;
+
+  --pad: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  width: 366px;
+  background: var(--cloth);
+  color: var(--chalk);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+
+/* ── Shell: the cloth ─────────────────────────────────────────────────── */
+
+.jt {
+  display: flex;
+  min-height: 180px;
+  background-color: var(--cloth);
+  /* Faint twill weave — kept near-invisible so it reads as cloth, not noise. */
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.014) 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px);
+  animation: jt-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes jt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ── Signature: the tick-ruler spine ──────────────────────────────────── */
+
+.jt__ruler {
+  position: relative;
+  flex: 0 0 26px;
+  align-self: stretch;
+  border-right: 1px solid rgba(201, 162, 75, 0.45); /* the tape edge */
+}
+
+/* minor chalk ticks, every 13px, short */
+.jt__ruler::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 7px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--seam-strong) 0 1px,
+    transparent 1px 13px
+  );
+}
+
+/* major brass ticks, every 65px, longer */
+.jt__ruler::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--brass) 0 1.5px,
+    transparent 1.5px 65px
+  );
+}
+
+.jt__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 14px var(--pad) 18px;
+}
+
+/* ── Masthead ─────────────────────────────────────────────────────────── */
+
+.jt__masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.jt__shears {
+  color: var(--brass);
+  font-size: 14px;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.jt__wordmark {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--chalk);
+}
+
+.jt__tagline {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+}
+
+/* ── Running-stitch seam divider ──────────────────────────────────────── */
+
+.jt__seam {
+  height: 1px;
+  margin: 12px 0 14px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--seam-strong) 0 6px,
+    transparent 6px 11px
+  );
+}
+
+/* ── Shared type ──────────────────────────────────────────────────────── */
+
+.jt__label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+  margin: 0 0 6px;
+}
+
+.jt__lede {
+  margin: 0;
+  font-size: 13px;
+  color: var(--chalk);
+}
+
+.jt__note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--chalk-dim);
+}
+
+.jt h2.jt__preview-title {
+  margin: 0 0 12px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--chalk);
+}
+
+/* ── Hang-tag: the parsed listing ─────────────────────────────────────── */
+
+.jt__tag {
+  position: relative;
+  margin-top: 4px;
+  padding: 13px 14px 13px 16px;
+  background: var(--chalk);
+  color: var(--ink);
+  /* angled top-left corner, like a real hang tag */
+  clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+}
+
+/* punched hole + brass thread up to the seam above */
+.jt__tag::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cloth);
+}
+
+.jt__tag-eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0 0 5px;
+}
+
+.jt__tag-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+/* ── Stamped "already logged" mark ────────────────────────────────────── */
+
+.jt__stamp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--chalk-dim);
+}
+
+.jt__stamp::before {
+  content: "✓";
+  color: var(--brass);
+  font-family: var(--font-sans);
+}
+
+/* ── Preview content ──────────────────────────────────────────────────── */
+
+.jt__section + .jt__section {
+  margin-top: 14px;
+}
+
+.jt__excerpt {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--chalk);
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.jt__excerpt--letter {
+  color: var(--chalk-dim);
+  -webkit-line-clamp: 3;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+
+.jt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.jt__btn {
+  appearance: none;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease,
+    transform 0.06s ease;
+}
+
+.jt__btn:active {
+  transform: translateY(1px);
+}
+
+.jt__btn--primary {
+  background: var(--brass);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.jt__btn--primary:hover {
+  background: var(--brass-bright);
+}
+
+.jt__btn--ghost {
+  background: transparent;
+  color: var(--chalk);
+  border-color: var(--seam-strong);
+}
+
+.jt__btn--ghost:hover {
+  border-color: var(--brass);
+  color: var(--brass-bright);
+}
+
+.jt__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+.jt__btn:focus-visible {
+  outline: 2px solid var(--brass-bright);
+  outline-offset: 2px;
+}
+
+a.jt__btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* ── Error (red thread) ───────────────────────────────────────────────── */
+
+.jt__alert {
+  border-left: 2px solid var(--thread);
+  padding: 2px 0 2px 12px;
+  margin: 4px 0 0;
+}
+
+.jt__alert-label {
+  color: var(--thread);
+}
+
+.jt__alert-msg {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--chalk);
+  word-break: break-word;
+}
+
+.jt__inline-error {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: var(--thread);
+}
+
+/* ── Loading / generating ─────────────────────────────────────────────── */
+
+.jt__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--chalk-dim);
+}
+
+/* marching running-stitch, echoing the seam — this is the "tailoring" motion */
+.jt__stitch {
+  flex: 1 1 auto;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--brass) 0 7px,
+    transparent 7px 13px
+  );
+  background-size: 13px 2px;
+  animation: jt-stitch 0.7s linear infinite;
+}
+
+@keyframes jt-stitch {
+  to {
+    background-position: 13px 0;
+  }
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .jt,
+  .jt__stitch {
+    animation: none;
+  }
+}
