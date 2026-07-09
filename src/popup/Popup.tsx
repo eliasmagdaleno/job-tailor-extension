@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import browser from "webextension-polyfill";
 import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication } from "../lib/storage";
-import { renderResumeHtml, renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
+import { renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
 import type { JobData, MasterProfile, TailoredOutput } from "../lib/types";
 
 type PopupState =
@@ -181,17 +181,13 @@ export default function Popup() {
 
   async function handleDownloadResume() {
     if (state.step !== "generated") return;
-    setDownloadError(null);
-    try {
-      const html = renderResumeHtml(state.output, state.profile.contact);
-      await downloadPdf(html, `${state.profile.contact.name} - Resume - ${state.jobData.company}.pdf`);
-    } catch (err) {
-      setDownloadError(err instanceof Error ? err.message : String(err));
-    }
+    if (!state.output.resume) return;
+    // Rewired to jsPDF in Task 5.
   }
 
   async function handleDownloadCoverLetter() {
     if (state.step !== "generated") return;
+    if (!state.output.coverLetter) return;
     setDownloadError(null);
     try {
       const html = renderCoverLetterHtml(state.output, state.profile.contact);
@@ -306,21 +302,29 @@ export default function Popup() {
   return (
     <Frame>
       <h2 className="jt__preview-title">Preview</h2>
-      <div className="jt__section">
-        <span className="jt__label">Summary</span>
-        <p className="jt__excerpt">{state.output.resume.summary}</p>
-      </div>
-      <div className="jt__section">
-        <span className="jt__label">Cover letter</span>
-        <p className="jt__excerpt jt__excerpt--letter">{state.output.coverLetter}</p>
-      </div>
+      {state.output.resume && (
+        <div className="jt__section">
+          <span className="jt__label">Summary</span>
+          <p className="jt__excerpt">{state.output.resume.summary}</p>
+        </div>
+      )}
+      {state.output.coverLetter && (
+        <div className="jt__section">
+          <span className="jt__label">Cover letter</span>
+          <p className="jt__excerpt jt__excerpt--letter">{state.output.coverLetter}</p>
+        </div>
+      )}
       <div className="jt__actions">
-        <button className="jt__btn jt__btn--primary" onClick={handleDownloadResume}>
-          Download Résumé PDF
-        </button>
-        <button className="jt__btn jt__btn--ghost" onClick={handleDownloadCoverLetter}>
-          Download Cover Letter PDF
-        </button>
+        {state.output.resume && (
+          <button className="jt__btn jt__btn--primary" onClick={handleDownloadResume}>
+            Download Résumé PDF
+          </button>
+        )}
+        {state.output.coverLetter && (
+          <button className="jt__btn jt__btn--ghost" onClick={handleDownloadCoverLetter}>
+            Download Cover Letter PDF
+          </button>
+        )}
       </div>
       {downloadError && (
         <p className="jt__inline-error" role="alert">

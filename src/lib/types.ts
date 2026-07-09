@@ -34,13 +34,18 @@ export interface MasterProfile {
   skills: string[];
 }
 
+export interface GenerationParts {
+  resume: boolean;
+  coverLetter: boolean;
+}
+
 export interface TailoredOutput {
-  resume: {
+  resume?: {
     summary: string;
     experience: Array<{ company: string; title: string; dates: string; bullets: string[] }>;
     skills: string[];
   };
-  coverLetter: string;
+  coverLetter?: string;
 }
 
 export interface ApplicationRecord {

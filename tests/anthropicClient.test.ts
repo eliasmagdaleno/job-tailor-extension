@@ -50,7 +50,7 @@ describe("parseTailorResponse", () => {
       coverLetter: "Dear hiring team,",
     });
     const result = parseTailorResponse(raw);
-    expect(result.resume.summary).toBe("Tailored summary");
+    expect(result.resume?.summary).toBe("Tailored summary");
     expect(result.coverLetter).toBe("Dear hiring team,");
   });
 

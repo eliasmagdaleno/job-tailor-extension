@@ -9,40 +9,8 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function renderResumeHtml(output: TailoredOutput, contact: MasterProfile["contact"]): string {
-  const experienceHtml = output.resume.experience
-    .map(
-      (job) => `
-        <section class="job">
-          <h3>${escapeHtml(job.title)} — ${escapeHtml(job.company)}</h3>
-          <p class="dates">${escapeHtml(job.dates)}</p>
-          <ul>${job.bullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("")}</ul>
-        </section>`
-    )
-    .join("");
-
-  const contactLine = [contact.email, contact.phone, contact.location]
-    .filter((v): v is string => Boolean(v))
-    .map(escapeHtml)
-    .join(" · ");
-
-  return `
-    <div class="resume">
-      <header>
-        <h1>${escapeHtml(contact.name)}</h1>
-        <p>${contactLine}</p>
-      </header>
-      <p class="summary">${escapeHtml(output.resume.summary)}</p>
-      ${experienceHtml}
-      <section class="skills">
-        <h3>Skills</h3>
-        <p>${output.resume.skills.map(escapeHtml).join(", ")}</p>
-      </section>
-    </div>`;
-}
-
 export function renderCoverLetterHtml(output: TailoredOutput, contact: MasterProfile["contact"]): string {
-  const paragraphs = output.coverLetter
+  const paragraphs = (output.coverLetter ?? "")
     .split(/\n{2,}/)
     .map((p) => `<p>${escapeHtml(p.trim())}</p>`)
     .join("");

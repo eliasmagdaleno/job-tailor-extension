@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml, renderResumeHtml, renderCoverLetterHtml } from "../src/lib/pdfTemplate";
+import { escapeHtml, renderCoverLetterHtml } from "../src/lib/pdfTemplate";
 import type { MasterProfile, TailoredOutput } from "../src/lib/types";
 
 const contact: MasterProfile["contact"] = {
@@ -29,30 +29,6 @@ describe("escapeHtml", () => {
     expect(escapeHtml('<script>alert("x")</script>')).toBe(
       "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"
     );
-  });
-});
-
-describe("renderResumeHtml", () => {
-  it("includes contact info, summary, experience, and skills", () => {
-    const html = renderResumeHtml(output, contact);
-    expect(html).toContain("Jane Doe");
-    expect(html).toContain("jane@example.com");
-    expect(html).toContain("Widgets Inc");
-    expect(html).toContain("Led redesign of checkout flow");
-    expect(html).toContain("Figma");
-  });
-
-  it("escapes bullet content to prevent HTML injection", () => {
-    const malicious: TailoredOutput = {
-      ...output,
-      resume: {
-        ...output.resume,
-        experience: [{ company: "X", title: "Y", dates: "Z", bullets: ["<img src=x onerror=alert(1)>"] }],
-      },
-    };
-    const html = renderResumeHtml(malicious, contact);
-    expect(html).not.toContain("<img src=x");
-    expect(html).toContain("&lt;img");
   });
 });
 
