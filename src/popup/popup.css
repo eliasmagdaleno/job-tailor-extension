@@ -441,3 +441,19 @@ a.jt__btn {
 .jt__choice-opt input {
   accent-color: var(--brass);
 }
+
+/* ── Masthead settings gear ──────────────────────────────────────────── */
+.jt__gear {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  color: var(--chalk-dim);
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.jt__gear:hover {
+  color: var(--brass-bright);
+}

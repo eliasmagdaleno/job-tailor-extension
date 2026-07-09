@@ -58,6 +58,14 @@ function Frame({ children }: { children: ReactNode }) {
           </span>
           <span className="jt__wordmark">Job Tailor</span>
           <span className="jt__tagline">Made to measure</span>
+          <button
+            className="jt__gear"
+            aria-label="Edit profile and settings"
+            title="Edit profile and settings"
+            onClick={() => browser.runtime.openOptionsPage()}
+          >
+            ⚙
+          </button>
         </header>
         <div className="jt__seam" aria-hidden="true" />
         {children}

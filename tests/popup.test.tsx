@@ -267,4 +267,21 @@ describe("Popup", () => {
     // no résumé download button when no résumé was produced
     expect(screen.queryByRole("button", { name: /Download Résumé/i })).toBeNull();
   });
+
+  it("shows a settings gear that opens the options page in every state", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(browser.tabs.sendMessage).mockResolvedValue(null); // "ready" with no job
+    render(<Popup />);
+    const gear = await screen.findByRole("button", { name: /settings|edit profile/i });
+    fireEvent.click(gear);
+    expect(browser.runtime.openOptionsPage).toHaveBeenCalled();
+  });
 });
