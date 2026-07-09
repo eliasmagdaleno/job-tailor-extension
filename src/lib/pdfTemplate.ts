@@ -63,18 +63,40 @@ export function renderCoverLetterHtml(output: TailoredOutput, contact: MasterPro
 }
 
 export async function downloadPdf(html: string, filename: string): Promise<void> {
-  const container = document.createElement("div");
-  container.innerHTML = html;
-  container.style.position = "fixed";
-  container.style.left = "-10000px";
-  container.style.top = "0";
-  container.style.width = "720px";
-  container.style.padding = "32px";
-  container.style.fontFamily = "Helvetica, Arial, sans-serif";
-  document.body.appendChild(container);
+  // html2pdf clones the element it's handed into an internal measuring wrapper
+  // and sizes the render canvas to that wrapper's height. If the element we
+  // pass carries `position: absolute`/`fixed`, the clone is out of normal flow,
+  // the wrapper collapses to zero height, and html2pdf embeds no image — a
+  // blank PDF. So the element passed to html2pdf (`content`) MUST stay in
+  // normal flow. To keep it hidden from the user, we nest it inside an
+  // off-screen `wrapper`; only the wrapper is positioned, not the content.
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "fixed";
+  wrapper.style.left = "-10000px";
+  wrapper.style.top = "0";
+
+  const content = document.createElement("div");
+  content.innerHTML = html;
+  content.style.width = "720px";
+  content.style.padding = "32px";
+  content.style.background = "#ffffff";
+  content.style.color = "#000000";
+  content.style.fontFamily = "Helvetica, Arial, sans-serif";
+
+  wrapper.appendChild(content);
+  document.body.appendChild(wrapper);
   try {
-    await html2pdf().from(container).set({ filename, margin: 0.5 }).save();
+    await html2pdf()
+      .from(content)
+      .set({
+        filename,
+        margin: 0.5,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, backgroundColor: "#ffffff", useCORS: true },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+      })
+      .save();
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(wrapper);
   }
 }
