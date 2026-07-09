@@ -29,12 +29,13 @@ describe("handleMessage", () => {
       callClaudeApi
     );
     expect(result).toEqual({ ok: true, data: { resume: { summary: "S", experience: [], skills: [] }, coverLetter: "C" } });
-    // schema (4th arg) is forwarded for generation
+    // schema (4th arg) and an AbortSignal (5th arg) are forwarded for generation
     expect(callClaudeApi).toHaveBeenCalledWith(
       "sk-ant-test",
       expect.any(String),
       expect.any(Array),
-      expect.objectContaining({ type: "object" })
+      expect.objectContaining({ type: "object" }),
+      expect.any(AbortSignal)
     );
   });
 
@@ -90,5 +91,76 @@ describe("handleMessage", () => {
     // @ts-expect-error testing an invalid message type deliberately
     const result = await handleMessage({ type: "UNKNOWN" }, callClaudeApi);
     expect(result.ok).toBe(false);
+  });
+
+  it("writes a running then done status to storage on a successful GENERATE_TAILORED", async () => {
+    const setGenerationStatus = vi.fn(async () => {});
+    const callClaudeApi = vi.fn(async () => JSON.stringify({ coverLetter: "C" }));
+    await handleMessage(
+      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test", parts: { resume: false, coverLetter: true } },
+      callClaudeApi,
+      setGenerationStatus
+    );
+    expect(setGenerationStatus).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ phase: "running", jobData, parts: { resume: false, coverLetter: true } })
+    );
+    expect(setGenerationStatus).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ phase: "done", jobData, output: { coverLetter: "C" } })
+    );
+  });
+
+  it("writes an error status to storage when the Claude call throws a non-abort error", async () => {
+    const setGenerationStatus = vi.fn(async () => {});
+    const callClaudeApi = vi.fn(async () => {
+      throw new Error("network down");
+    });
+    const result = await handleMessage(
+      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test", parts: { resume: true, coverLetter: true } },
+      callClaudeApi,
+      setGenerationStatus
+    );
+    expect(result).toEqual({ ok: false, error: "network down" });
+    expect(setGenerationStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ phase: "error", jobData, message: "network down" })
+    );
+  });
+
+  it("marks generation as cancelled (not error) when CANCEL_GENERATION aborts an in-flight request", async () => {
+    const setGenerationStatus = vi.fn(async () => {});
+    let capturedSignal: AbortSignal | undefined;
+    const callClaudeApi = vi.fn(
+      (_apiKey: string, _system: string, _messages: unknown, _schema: unknown, signal?: AbortSignal) => {
+        capturedSignal = signal;
+        return new Promise<string>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => {
+            const err = new Error("The operation was aborted.");
+            err.name = "AbortError";
+            reject(err);
+          });
+        });
+      }
+    );
+
+    const generatePromise = handleMessage(
+      { type: "GENERATE_TAILORED", jobData, profile, apiKey: "sk-ant-test", parts: { resume: true, coverLetter: true } },
+      callClaudeApi,
+      setGenerationStatus
+    );
+
+    // let handleMessage's microtasks run so callClaudeApi has been called and
+    // registered its abort listener before we cancel.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(capturedSignal).toBeInstanceOf(AbortSignal);
+
+    const cancelResult = await handleMessage({ type: "CANCEL_GENERATION" }, callClaudeApi, setGenerationStatus);
+    expect(cancelResult).toEqual({ ok: true });
+
+    const generateResult = await generatePromise;
+    expect(generateResult).toEqual({ ok: false, error: "cancelled" });
+    expect(setGenerationStatus).toHaveBeenLastCalledWith(
+      expect.objectContaining({ phase: "cancelled", jobData, parts: { resume: true, coverLetter: true } })
+    );
   });
 });
