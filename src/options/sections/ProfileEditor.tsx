@@ -26,11 +26,10 @@ export default function ProfileEditor() {
   // skills) aren't eaten by a controlled value that re-renders from a
   // filtered array on every change. Normalized into `profile` on save.
   const [bulletsDrafts, setBulletsDrafts] = useState<string[]>([]);
-  const [skillsDraft, setSkillsDraft] = useState<string>("");
+  const [skillInput, setSkillInput] = useState<string>("");
 
   function resetDrafts(p: MasterProfile) {
     setBulletsDrafts(p.experience.map((exp) => exp.bullets.join("\n")));
-    setSkillsDraft(p.skills.join(", "));
   }
 
   useEffect(() => {
@@ -53,10 +52,6 @@ export default function ProfileEditor() {
           .map((b) => b.trim())
           .filter(Boolean),
       })),
-      skills: skillsDraft
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
     };
     await setMasterProfile(normalized);
     setProfile(normalized);
@@ -138,16 +133,26 @@ export default function ProfileEditor() {
     setProfile({ ...profile, education: profile.education.filter((_, i) => i !== index) });
   }
 
+  function addSkill() {
+    const skill = skillInput.trim();
+    if (!skill) return;
+    setProfile({ ...profile, skills: [...profile.skills, skill] });
+    setSkillInput("");
+  }
+
+  function removeSkill(index: number) {
+    setProfile({ ...profile, skills: profile.skills.filter((_, i) => i !== index) });
+  }
+
   return (
     <section className="wb__clause">
       <div className="wb__clause-head">
         <span className="wb__clause-no">§ 02</span>
-        <h2 className="wb__clause-title">The Pattern Block</h2>
+        <h2 className="wb__clause-title">Profile</h2>
         <span className="wb__clause-rule" aria-hidden="true" />
       </div>
       <p className="wb__lede">
-        Your measurements, taken once. Every tailored résumé is cut from this block — keep it complete
-        and current.
+        Used to generate every résumé and cover letter. Keep it complete and up to date.
       </p>
 
       <label className="wb__import">
@@ -267,13 +272,40 @@ export default function ProfileEditor() {
 
       <div className="wb__field">
         <label className="wb__label" htmlFor="wb-skills">
-          Skills (comma-separated)
+          Skills
         </label>
+        {profile.skills.length > 0 ? (
+          <div className="wb__skills-wrap">
+            {profile.skills.map((skill, i) => (
+              <span className="wb__skill-chip" key={`${skill}-${i}`}>
+                {skill}
+                <button
+                  type="button"
+                  className="wb__skill-remove"
+                  aria-label={`Remove ${skill}`}
+                  onClick={() => removeSkill(i)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="wb__skills-empty">No skills added yet.</p>
+        )}
         <input
           id="wb-skills"
           className="wb__input"
-          value={skillsDraft}
-          onChange={(e) => setSkillsDraft(e.target.value)}
+          placeholder="Type a skill and press Enter"
+          value={skillInput}
+          onChange={(e) => setSkillInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              addSkill();
+            }
+          }}
+          onBlur={addSkill}
         />
       </div>
 

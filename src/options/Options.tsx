@@ -13,7 +13,6 @@ export default function Options() {
             ✂
           </span>
           <h1 className="wb__wordmark">Job Tailor</h1>
-          <span className="wb__tagline">Made&#8209;to&#8209;measure · The Workbook</span>
         </header>
         <hr className="wb__seam" />
 

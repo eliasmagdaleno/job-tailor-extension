@@ -304,6 +304,50 @@ body {
   margin-bottom: 12px;
 }
 
+/* ── Skills: removable chips + type-to-add ──────────────────────────────── */
+
+.wb__skills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.wb__skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  background: var(--cloth-raise);
+  border: 1px solid var(--seam-strong);
+  border-radius: 2px;
+  font-size: 13px;
+  color: var(--chalk);
+}
+
+.wb__skill-remove {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--chalk-dim);
+  cursor: pointer;
+}
+
+.wb__skill-remove:hover {
+  color: var(--thread);
+}
+
+.wb__skills-empty {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--chalk-dim);
+}
+
 /* ── Pattern pieces: repeated experience / education entries ───────────── */
 
 .wb__pieces {

@@ -30,7 +30,7 @@ export default function ApplicationsTable() {
     <section className="wb__clause">
       <div className="wb__clause-head">
         <span className="wb__clause-no">§ 03</span>
-        <h2 className="wb__clause-title">The Order Book</h2>
+        <h2 className="wb__clause-title">Applications</h2>
         <span className="wb__clause-rule" aria-hidden="true" />
       </div>
       <p className="wb__lede">Every job you've logged, and where it stands.</p>
@@ -78,7 +78,7 @@ export default function ApplicationsTable() {
             </tbody>
           </table>
           {records.length === 0 && (
-            <p className="wb__ledger-empty">No orders yet — tailor a listing to open the book.</p>
+            <p className="wb__ledger-empty">No applications yet.</p>
           )}
         </div>
       </div>

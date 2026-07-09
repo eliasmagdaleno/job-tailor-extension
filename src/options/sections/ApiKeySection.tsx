@@ -22,7 +22,7 @@ export default function ApiKeySection() {
         <span className="wb__clause-rule" aria-hidden="true" />
       </div>
       <p className="wb__lede">
-        Your Anthropic key stays on this machine. It signs every résumé and cover letter cut here.
+        Your Anthropic key stays on this machine. It's used to generate every résumé and cover letter you create.
       </p>
 
       <div className="wb__field">
