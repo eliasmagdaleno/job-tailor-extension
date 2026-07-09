@@ -9,7 +9,8 @@
   },
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
-    "https://www.welcome-to-the-jungle.com/*",
+    "https://www.welcometothejungle.com/*",
+    "https://app.welcometothejungle.com/*",
     "https://api.anthropic.com/*"
   ],
   "background": {
@@ -18,7 +19,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.welcome-to-the-jungle.com/*"],
+      "matches": [
+        "https://www.welcometothejungle.com/*",
+        "https://app.welcometothejungle.com/*"
+      ],
       "js": ["src/content-scripts/wttj-parser.ts"]
     }
   ],
