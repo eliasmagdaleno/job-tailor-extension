@@ -335,7 +335,7 @@ describe("Popup", () => {
     const referenceCheckbox = await screen.findByLabelText(/match my reference letter/i);
     fireEvent.click(referenceCheckbox);
 
-    const noteField = screen.getByPlaceholderText(/anything specific to mention/i);
+    const noteField = screen.getByPlaceholderText(/what do you want the employer to know/i);
     fireEvent.change(noteField, { target: { value: "I've used their product for years." } });
 
     fireEvent.click(screen.getByRole("button", { name: /generate/i }));

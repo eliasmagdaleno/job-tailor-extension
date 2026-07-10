@@ -423,7 +423,7 @@ export default function Popup() {
             )}
             <textarea
               className="jt__note"
-              placeholder="Anything specific to mention for this job? (optional)"
+              placeholder="What do you want the employer to know about you for this job? (optional, but a specific detail makes the letter sound more like you)"
               value={oneOffNote}
               onChange={(e) => setOneOffNote(e.target.value)}
             />

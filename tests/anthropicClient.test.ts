@@ -147,6 +147,17 @@ describe("buildTailorRequest cover letter options", () => {
     const parsed = JSON.parse(messages[0].content);
     expect(parsed.candidateProfile.jobSpecificNote).toBe("I used their product as a customer for two years.");
   });
+
+  it("includes anti-cliche/humanizing instructions in the system prompt for a cover letter request", () => {
+    const { system } = buildTailorRequest(jobData, profile, { resume: false, coverLetter: true });
+    expect(system).toContain("I am excited to apply");
+    expect(system).toContain("em dash");
+  });
+
+  it("omits the humanizing instructions from a résumé-only request", () => {
+    const { system } = buildTailorRequest(jobData, profile, { resume: true, coverLetter: false });
+    expect(system).not.toContain("em dash");
+  });
 });
 
 describe("parseTailorResponse parts", () => {

@@ -89,6 +89,17 @@ export function buildTailorRequest(
   const includeReference = Boolean(coverLetterOptions?.includeReference && profile.coverLetterReference);
 
   if (parts.coverLetter) {
+    system +=
+      " Write the cover letter the way a real person would write one, not the way an " +
+      "AI assistant would. Do not open with \"I am excited to apply\" or any variant. " +
+      "Avoid stock phrases like \"leverage my skills,\" \"proven track record,\" " +
+      "\"passionate about,\" \"hit the ground running,\" or \"fast-paced environment.\" " +
+      "Vary sentence length on purpose instead of making every sentence and paragraph " +
+      "the same shape. Do not lean on triads (\"X, Y, and Z\") or em dash-joined clauses " +
+      "as a crutch. Reference 1-2 concrete specifics from the candidate's experience or " +
+      "the job listing rather than describing achievements in the abstract. Do not just " +
+      "summarize the resume — say something it can't. Skip a closing line like " +
+      "\"I would welcome the opportunity to discuss further\"; end plainly.";
     if (profile.coverLetterStyle?.preset) {
       system += ` Write the cover letter in a ${profile.coverLetterStyle.preset} tone.`;
       if (profile.coverLetterStyle.customNotes) {
