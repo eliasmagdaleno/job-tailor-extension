@@ -8,6 +8,7 @@ vi.mock("../src/lib/storage", () => ({
   findApplicationByUrl: vi.fn(),
   addApplication: vi.fn(),
   getGenerationStatus: vi.fn(),
+  setGenerationStatus: vi.fn(),
 }));
 
 vi.mock("webextension-polyfill", () => ({
@@ -567,5 +568,73 @@ describe("Popup", () => {
     );
 
     expect(await screen.findByText("Generation cancelled.")).toBeInTheDocument();
+  });
+
+  it("clears the persisted generation status after reconnecting into the generated step", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    vi.mocked(storage.getGenerationStatus).mockResolvedValue({
+      phase: "done",
+      jobData: {
+        title: "Product Designer",
+        company: "Acme",
+        description: "desc",
+        url: "https://example.com/job/1",
+        site: "Welcome to the Jungle",
+        parsedVia: "structured",
+      },
+      parts: { resume: true, coverLetter: true },
+      output: { resume: { summary: "Tailored summary", experience: [], skills: [] }, coverLetter: "Dear hiring team," },
+    });
+
+    render(<Popup />);
+    expect(await screen.findByText("Preview")).toBeInTheDocument();
+    expect(storage.setGenerationStatus).toHaveBeenCalledWith(null);
+  });
+
+  it("retries a reconnected error by dispatching a fresh generation", async () => {
+    vi.mocked(storage.getApiKey).mockResolvedValue("sk-ant-test");
+    vi.mocked(storage.getMasterProfile).mockResolvedValue({
+      contact: { name: "Jane Doe", email: "jane@example.com" },
+      summary: "s",
+      experience: [],
+      education: [],
+      skills: [],
+    });
+    vi.mocked(storage.findApplicationByUrl).mockResolvedValue(null);
+    const jobData = {
+      title: "Product Designer",
+      company: "Acme",
+      description: "desc",
+      url: "https://example.com/job/1",
+      site: "Welcome to the Jungle" as const,
+      parsedVia: "structured" as const,
+    };
+    vi.mocked(storage.getGenerationStatus).mockResolvedValue({
+      phase: "error",
+      jobData,
+      parts: { resume: true, coverLetter: true },
+      message: "Claude API error (500): oops",
+    });
+    vi.mocked(browser.runtime.sendMessage).mockResolvedValue({
+      ok: true,
+      data: { resume: { summary: "Tailored summary", experience: [], skills: [] }, coverLetter: "Dear hiring team," },
+    });
+
+    render(<Popup />);
+    const retryButton = await screen.findByRole("button", { name: "Retry" });
+    fireEvent.click(retryButton);
+
+    expect(await screen.findByText("Preview")).toBeInTheDocument();
+    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "GENERATE_TAILORED", jobData, parts: { resume: true, coverLetter: true } })
+    );
   });
 });

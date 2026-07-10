@@ -1,6 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import browser from "webextension-polyfill";
-import { getApiKey, getMasterProfile, findApplicationByUrl, addApplication, getGenerationStatus } from "../lib/storage";
+import {
+  getApiKey,
+  getMasterProfile,
+  findApplicationByUrl,
+  addApplication,
+  getGenerationStatus,
+  setGenerationStatus,
+} from "../lib/storage";
 import { renderCoverLetterHtml, downloadPdf } from "../lib/pdfTemplate";
 import { downloadResumePdf } from "../lib/resumePdf";
 import type { GenerationParts, GenerationStatus, JobData, MasterProfile, TailoredOutput } from "../lib/types";
@@ -90,6 +97,7 @@ export default function Popup() {
   const [choice, setChoice] = useState<Choice>("both");
   const [includeReference, setIncludeReference] = useState(false);
   const [oneOffNote, setOneOffNote] = useState("");
+  const generatingRef = useRef(false);
 
   useEffect(() => {
     void bootstrap();
@@ -104,6 +112,7 @@ export default function Popup() {
       const next = changes.generationStatus?.newValue as GenerationStatus | undefined;
       if (!next || next.phase === "running") return;
       const { apiKey, profile, jobData, alreadyLoggedOn } = generatingState;
+      void setGenerationStatus(null);
       if (next.phase === "done") {
         setState({ step: "generated", apiKey, profile, jobData, output: next.output!, alreadyLoggedOn });
       } else if (next.phase === "error") {
@@ -113,7 +122,7 @@ export default function Popup() {
           // Uses the persisted parts from storage, not the popup's own `choice`
           // state — this listener path only matters for a reconnected instance
           // that never chose anything itself (its `choice` is just the default).
-          retry: () => void handleGenerate(jobData, next.parts),
+          retry: () => void handleGenerate(apiKey, profile, jobData, next.parts),
         });
       } else {
         setState({ step: "ready", apiKey, profile, jobData, unavailable: null, alreadyLoggedOn, cancelledNotice: true });
@@ -151,6 +160,7 @@ export default function Popup() {
     if (generationStatus?.phase === "done") {
       const alreadyLoggedOn =
         (await findApplicationByUrl(generationStatus.jobData.url))?.dateApplied ?? null;
+      await setGenerationStatus(null);
       setState({
         step: "generated",
         apiKey,
@@ -162,10 +172,11 @@ export default function Popup() {
       return;
     }
     if (generationStatus?.phase === "error") {
+      await setGenerationStatus(null);
       setState({
         step: "error",
         message: generationStatus.message,
-        retry: () => void handleGenerate(generationStatus.jobData, generationStatus.parts),
+        retry: () => void handleGenerate(apiKey, profile, generationStatus.jobData, generationStatus.parts),
       });
       return;
     }
@@ -205,9 +216,16 @@ export default function Popup() {
     }
   }
 
-  async function handleGenerate(jobData: JobData, parts: GenerationParts) {
-    if (state.step !== "ready") return;
-    const { apiKey, profile, alreadyLoggedOn } = state;
+  async function handleGenerate(
+    apiKey: string,
+    profile: MasterProfile,
+    jobData: JobData,
+    parts: GenerationParts
+  ) {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+
+    const alreadyLoggedOn = (await findApplicationByUrl(jobData.url))?.dateApplied ?? null;
     setState({ step: "generating", apiKey, profile, jobData, alreadyLoggedOn });
 
     const coverLetterOptions = parts.coverLetter
@@ -225,15 +243,19 @@ export default function Popup() {
         coverLetterOptions,
       })) as { ok: true; data: TailoredOutput } | { ok: false; error: string };
     } catch (err) {
+      generatingRef.current = false;
       setState({
         step: "error",
         message: err instanceof Error ? err.message : String(err),
-        retry: () => void handleGenerate(jobData, parts),
+        retry: () => void handleGenerate(apiKey, profile, jobData, parts),
       });
       return;
     }
 
+    generatingRef.current = false;
+
     if (response.ok) {
+      void setGenerationStatus(null);
       const existing = await findApplicationByUrl(jobData.url);
       setState({
         step: "generated",
@@ -244,6 +266,7 @@ export default function Popup() {
         alreadyLoggedOn: existing?.dateApplied ?? null,
       });
     } else if (response.error === "cancelled") {
+      void setGenerationStatus(null);
       setState({
         step: "ready",
         apiKey,
@@ -254,7 +277,8 @@ export default function Popup() {
         cancelledNotice: true,
       });
     } else {
-      setState({ step: "error", message: response.error, retry: () => void handleGenerate(jobData, parts) });
+      void setGenerationStatus(null);
+      setState({ step: "error", message: response.error, retry: () => void handleGenerate(apiKey, profile, jobData, parts) });
     }
   }
 
@@ -408,7 +432,7 @@ export default function Popup() {
         <div className="jt__actions">
           <button
             className="jt__btn jt__btn--primary"
-            onClick={() => handleGenerate(jobData, CHOICE_TO_PARTS[choice])}
+            onClick={() => handleGenerate(state.apiKey, state.profile, jobData, CHOICE_TO_PARTS[choice])}
           >
             Generate
           </button>
